@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle, ChevronRight, X, Calendar, Banknote } from 'lucide-react';
+import { CheckCircle, ChevronRight, X, Calendar, Banknote, Link } from 'lucide-react';
 import { kaligadhsDB, assignmentsDB, activityDB, ordersDB } from '../db';
 import { generateUUID, formatCurrency, formatDate, todayISO, ITEM_COLORS } from '../utils';
 import { Modal, Badge, EmptyState, ItemTag } from '../components/UI';
@@ -209,6 +209,13 @@ export default function Kaligadh() {
                     <td onClick={e => e.stopPropagation()}>
                       <div className="flex gap-2">
                         <button className="btn btn-ghost btn-sm" onClick={() => setSelected(k)}><ChevronRight size={13} /></button>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          title="Copy worker profile link"
+                          onClick={() => navigator.clipboard.writeText(`${window.location.origin}/kaligadh/${k.id}`)}
+                        >
+                          <Link size={13} />
+                        </button>
                         {(k.totalDue || 0) > 0 && (
                           <button className="btn btn-accent btn-sm" onClick={() => setClearing(k)}>
                             <CheckCircle size={13} /> Clear
