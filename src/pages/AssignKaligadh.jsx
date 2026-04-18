@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Check, UserCheck } from 'lucide-react';
-import { kaligadhsDB, assignmentsDB, activityDB, settingsDB } from '../db';
-import { generateUUID, DEFAULT_MAKING_COSTS, ITEM_COLORS, formatCurrency } from '../utils';
+import { kaligadhsDB, assignmentsDB, activityDB, salaryPaymentsDB } from '../db';
+import { generateUUID, formatCurrency, monthKey } from '../utils';
 import { ItemTag } from '../components/UI';
 
-export default function AssignKaligadh({ order, onDone }) {
+export default function AssignKaligadh({ order, itemCategories, onDone }) {
   const [kaligadhs, setKaligadhs] = useState([]);
-  const [costs, setCosts] = useState(DEFAULT_MAKING_COSTS);
+  const [costs, setCosts] = useState({});
   const [assignments, setAssignments] = useState({});
   const [saving, setSaving] = useState(false);
 
@@ -15,8 +15,7 @@ export default function AssignKaligadh({ order, onDone }) {
   async function load() {
     const ks = await kaligadhsDB.getAll();
     setKaligadhs(ks);
-    const savedCosts = await settingsDB.get('makingCosts');
-    const c = savedCosts || DEFAULT_MAKING_COSTS;
+    const c = Object.fromEntries((itemCategories || []).map(i => [i.name, i.makingCost]));
     setCosts(c);
     // Pre-fill assignments with defaults
     const init = {};
@@ -51,14 +50,16 @@ export default function AssignKaligadh({ order, onDone }) {
         assignedAt: new Date().toISOString(),
       });
 
-      // Update kaligadh due
+      // Update kaligadh due (legacy field kept for backward compat)
       const k = await kaligadhsDB.getById(kaligadhId);
       if (k) {
         await kaligadhsDB.save({ ...k, totalDue: (k.totalDue || 0) + cost });
       }
 
-      // Log expense in activity
       const kName = kaligadhs.find(x => x.id === kaligadhId)?.name || 'Unknown';
+      const now = new Date().toISOString();
+
+      // Log expense in activity (making cost earned by kaligadh = liability for business)
       await activityDB.save({
         id: generateUUID(),
         type: 'expense',
@@ -67,8 +68,29 @@ export default function AssignKaligadh({ order, onDone }) {
         description: `Making cost — ${kName} (${item})`,
         referenceId: order.id,
         referenceType: 'order',
-        date: new Date().toISOString(),
+        date: now,
       });
+
+      // Auto-recover advance from salary payments if there is an outstanding advance
+      if (cost > 0) {
+        const workerPayments = await salaryPaymentsDB.getByKaligadh(kaligadhId);
+        const advGiven     = workerPayments.filter(p => p.type === 'advance').reduce((s, p) => s + (p.amount || 0), 0);
+        const advRecovered = workerPayments.filter(p => p.type === 'recovery').reduce((s, p) => s + (p.amount || 0), 0);
+        const advBalance   = Math.max(0, advGiven - advRecovered);
+        if (advBalance > 0) {
+          const recoveryAmt = Math.min(cost, advBalance);
+          await salaryPaymentsDB.save({
+            id: generateUUID(),
+            kaligadhId,
+            month: monthKey(),
+            type: 'recovery',
+            amount: recoveryAmt,
+            date: now,
+            note: `Auto-recovery: ${item} · order ${order.id}`,
+            createdAt: now,
+          });
+        }
+      }
     }
     setSaving(false);
     onDone();
@@ -88,7 +110,6 @@ export default function AssignKaligadh({ order, onDone }) {
           </div>
 
           {order.items.map(item => {
-            const c = ITEM_COLORS[item] || {};
             const a = assignments[item] || {};
             const filteredWorkers = kaligadhs.filter(k => k.specialties?.includes(item));
             return (

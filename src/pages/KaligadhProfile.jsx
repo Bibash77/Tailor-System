@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { kaligadhsDB, assignmentsDB, ordersDB } from '../db';
 import { formatCurrency, formatDate } from '../utils';
-import { ItemTag } from '../components/UI';
+import { ItemTag, Avatar } from '../components/UI';
 
 function ProfileView({ kaligadh, onBack }) {
   const [assignments, setAssignments] = useState([]);
@@ -42,6 +42,7 @@ function ProfileView({ kaligadh, onBack }) {
               <ChevronLeft size={16} /> Back
             </button>
           )}
+          <Avatar name={kaligadh.name} size={48} />
           <div>
             <h2 style={{ margin: 0 }}>{kaligadh.name}</h2>
             <p style={{ margin: 0 }}>Worker Profile</p>

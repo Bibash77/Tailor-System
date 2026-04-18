@@ -1,13 +1,18 @@
 const DB_NAME = 'TailorAppDB';
-const DB_VERSION = 1;
+const DB_VERSION = 5;
 
 const STORES = {
   ORDERS: 'orders',
   KALIGADHS: 'kaligadhs',
   ASSIGNMENTS: 'assignments',
   DEALERS: 'dealers',
+  DEALER_PAYMENTS: 'dealerPayments',
+  KALIGADH_PAYMENTS: 'kaligadhPayments',
+  SALARY_RECORDS: 'salaryRecords',
+  SALARY_PAYMENTS: 'salaryPayments',
   ACTIVITY: 'activity',
   SETTINGS: 'settings',
+  EXPENSES: 'expenses',
 };
 
 let db = null;
@@ -32,7 +37,30 @@ export function openDB() {
         as.createIndex('kaligadhId', 'kaligadhId', { unique: false });
       }
       if (!database.objectStoreNames.contains(STORES.DEALERS)) {
-        database.createObjectStore(STORES.DEALERS, { keyPath: 'id' });
+        const ds = database.createObjectStore(STORES.DEALERS, { keyPath: 'id' });
+        ds.createIndex('category', 'category', { unique: false });
+        ds.createIndex('paymentStatus', 'paymentStatus', { unique: false });
+      }
+      if (!database.objectStoreNames.contains(STORES.DEALER_PAYMENTS)) {
+        const dp = database.createObjectStore(STORES.DEALER_PAYMENTS, { keyPath: 'id' });
+        dp.createIndex('dealerId', 'dealerId', { unique: false });
+      }
+      if (!database.objectStoreNames.contains(STORES.KALIGADH_PAYMENTS)) {
+        const kp = database.createObjectStore(STORES.KALIGADH_PAYMENTS, { keyPath: 'id' });
+        kp.createIndex('kaligadhId', 'kaligadhId', { unique: false });
+        kp.createIndex('type', 'type', { unique: false });
+        kp.createIndex('date', 'date', { unique: false });
+      }
+      if (!database.objectStoreNames.contains(STORES.SALARY_RECORDS)) {
+        const sr = database.createObjectStore(STORES.SALARY_RECORDS, { keyPath: 'id' });
+        sr.createIndex('kaligadhId', 'kaligadhId', { unique: false });
+        sr.createIndex('month', 'month', { unique: false });
+      }
+      if (!database.objectStoreNames.contains(STORES.SALARY_PAYMENTS)) {
+        const sp = database.createObjectStore(STORES.SALARY_PAYMENTS, { keyPath: 'id' });
+        sp.createIndex('kaligadhId', 'kaligadhId', { unique: false });
+        sp.createIndex('month', 'month', { unique: false });
+        sp.createIndex('type', 'type', { unique: false });
       }
       if (!database.objectStoreNames.contains(STORES.ACTIVITY)) {
         const act = database.createObjectStore(STORES.ACTIVITY, { keyPath: 'id' });
@@ -41,6 +69,12 @@ export function openDB() {
       }
       if (!database.objectStoreNames.contains(STORES.SETTINGS)) {
         database.createObjectStore(STORES.SETTINGS, { keyPath: 'key' });
+      }
+      if (!database.objectStoreNames.contains(STORES.EXPENSES)) {
+        const exp = database.createObjectStore(STORES.EXPENSES, { keyPath: 'id' });
+        exp.createIndex('date', 'date', { unique: false });
+        exp.createIndex('paymentStatus', 'paymentStatus', { unique: false });
+        exp.createIndex('category', 'category', { unique: false });
       }
     };
     req.onsuccess = (e) => { db = e.target.result; resolve(db); };
@@ -118,6 +152,43 @@ export const dealersDB = {
   getById: (id) => getById(STORES.DEALERS, id),
   save: (d) => put(STORES.DEALERS, d),
   delete: (id) => remove(STORES.DEALERS, id),
+  getByCategory: (category) => getAllByIndex(STORES.DEALERS, 'category', category),
+};
+
+// ─── DEALER PAYMENTS ───
+export const dealerPaymentsDB = {
+  getAll: () => getAll(STORES.DEALER_PAYMENTS),
+  getById: (id) => getById(STORES.DEALER_PAYMENTS, id),
+  save: (p) => put(STORES.DEALER_PAYMENTS, p),
+  delete: (id) => remove(STORES.DEALER_PAYMENTS, id),
+  getByDealer: (dealerId) => getAllByIndex(STORES.DEALER_PAYMENTS, 'dealerId', dealerId),
+};
+
+// ─── KALIGADH PAYMENTS ───
+export const kaligadhPaymentsDB = {
+  getAll: () => getAll(STORES.KALIGADH_PAYMENTS),
+  getById: (id) => getById(STORES.KALIGADH_PAYMENTS, id),
+  save: (p) => put(STORES.KALIGADH_PAYMENTS, p),
+  delete: (id) => remove(STORES.KALIGADH_PAYMENTS, id),
+  getByKaligadh: (kaligadhId) => getAllByIndex(STORES.KALIGADH_PAYMENTS, 'kaligadhId', kaligadhId),
+};
+
+// ─── SALARY RECORDS (one per employee per month) ───
+export const salaryRecordsDB = {
+  getAll: () => getAll(STORES.SALARY_RECORDS),
+  getById: (id) => getById(STORES.SALARY_RECORDS, id),
+  save: (r) => put(STORES.SALARY_RECORDS, r),
+  delete: (id) => remove(STORES.SALARY_RECORDS, id),
+  getByKaligadh: (kaligadhId) => getAllByIndex(STORES.SALARY_RECORDS, 'kaligadhId', kaligadhId),
+};
+
+// ─── SALARY PAYMENTS (individual cash payments, advances, recoveries) ───
+export const salaryPaymentsDB = {
+  getAll: () => getAll(STORES.SALARY_PAYMENTS),
+  getById: (id) => getById(STORES.SALARY_PAYMENTS, id),
+  save: (p) => put(STORES.SALARY_PAYMENTS, p),
+  delete: (id) => remove(STORES.SALARY_PAYMENTS, id),
+  getByKaligadh: (kaligadhId) => getAllByIndex(STORES.SALARY_PAYMENTS, 'kaligadhId', kaligadhId),
 };
 
 // ─── ACTIVITY ───
@@ -134,6 +205,14 @@ export const settingsDB = {
     return row ? row.value : null;
   },
   set: (key, value) => put(STORES.SETTINGS, { key, value }),
+};
+
+// ─── EXPENSES ───
+export const expensesDB = {
+  getAll: () => getAll(STORES.EXPENSES),
+  getById: (id) => getById(STORES.EXPENSES, id),
+  save: (e) => put(STORES.EXPENSES, e),
+  delete: (id) => remove(STORES.EXPENSES, id),
 };
 
 export { STORES };

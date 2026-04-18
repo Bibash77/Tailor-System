@@ -1,5 +1,34 @@
 import { X, Search, CheckCircle } from 'lucide-react';
-import { ITEM_COLORS } from '../utils';
+import { getItemColor, formatDate, FIELD_LABELS } from '../utils';
+
+const AVATAR_COLORS = [
+  { bg: '#EFF6FF', text: '#1D4ED8' },
+  { bg: '#F0FDF4', text: '#15803D' },
+  { bg: '#FFF7ED', text: '#C2410C' },
+  { bg: '#FDF4FF', text: '#7E22CE' },
+  { bg: '#FFF1F2', text: '#BE123C' },
+  { bg: '#F0FDFA', text: '#0F766E' },
+];
+
+export function Avatar({ name, size = 40 }) {
+  const initials = name
+    ? name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()
+    : '?';
+  const c = AVATAR_COLORS[(name?.charCodeAt(0) || 0) % AVATAR_COLORS.length];
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: c.bg, color: c.text,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontWeight: 700, fontSize: Math.round(size * 0.36),
+      fontFamily: 'DM Serif Display',
+      border: `2px solid ${c.text}33`,
+      flexShrink: 0, userSelect: 'none',
+    }}>
+      {initials}
+    </div>
+  );
+}
 
 export function Modal({ title, onClose, children, footer, size = '' }) {
   return (
@@ -36,7 +65,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search...' }) {
 }
 
 export function ItemTag({ item }) {
-  const c = ITEM_COLORS[item] || { bg: '#F5F5F4', text: '#44403C', border: '#E7E5E4' };
+  const c = getItemColor(item);
   return (
     <span className="item-tag" style={{ background: c.bg, color: c.text, borderColor: c.border }}>
       {item}
@@ -107,6 +136,65 @@ export function StatCard({ label, value, sub, accent }) {
       <div className="stat-value" style={accent ? { color: accent } : {}}>{value}</div>
       {sub && <div className="stat-sub">{sub}</div>}
     </div>
+  );
+}
+
+// ─── HISTORY MODAL ────────────────────────────────────────────────────────────
+function formatHistoryValue(key, val) {
+  if (val === null || val === undefined || val === '') return '—';
+  if (Array.isArray(val)) return val.join(', ');
+  if (typeof val === 'number') {
+    const amtFields = new Set(['totalAmount','advanceAmount','discount','remainingAmount','amount','makingCost']);
+    if (amtFields.has(key)) return `Rs. ${val.toLocaleString('en-NP')}`;
+    return String(val);
+  }
+  if (typeof val === 'string') {
+    // ISO date strings
+    if (/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(val)) return formatDate(val);
+    return val;
+  }
+  return String(val);
+}
+
+export function HistoryModal({ title, history = [], onClose }) {
+  const sorted = [...history].reverse(); // newest first
+  return (
+    <Modal title={`Edit History — ${title}`} onClose={onClose} size="modal-lg"
+      footer={<button className="btn btn-ghost" onClick={onClose}>Close</button>}>
+      {sorted.length === 0 ? (
+        <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+          No edits recorded yet.
+        </div>
+      ) : sorted.map((entry, idx) => (
+        <div key={idx} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: idx < sorted.length - 1 ? '1px solid var(--paper-2)' : 'none' }}>
+          <div style={{ fontSize: 11, color: 'var(--ink-4)', fontWeight: 600, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--blue)', display: 'inline-block', flexShrink: 0 }} />
+            {formatDate(entry.changedAt)}
+            {entry.changedAt && (
+              <span style={{ color: 'var(--ink-4)', fontWeight: 400 }}>
+                · {new Date(entry.changedAt).toLocaleTimeString('en-NP', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {Object.entries(entry.changes || {}).map(([field, { from, to }]) => (
+              <div key={field} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, padding: '6px 10px', background: 'var(--paper-2)', borderRadius: 6 }}>
+                <span style={{ fontWeight: 700, color: 'var(--ink-3)', minWidth: 110, flexShrink: 0 }}>
+                  {FIELD_LABELS[field] || field}
+                </span>
+                <span style={{ color: 'var(--red)', textDecoration: 'line-through', flex: 1, wordBreak: 'break-all' }}>
+                  {formatHistoryValue(field, from)}
+                </span>
+                <span style={{ color: 'var(--ink-4)', flexShrink: 0 }}>→</span>
+                <span style={{ color: 'var(--green)', fontWeight: 600, flex: 1, wordBreak: 'break-all' }}>
+                  {formatHistoryValue(field, to)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </Modal>
   );
 }
 
