@@ -1,161 +1,332 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Check, X } from 'lucide-react';
-import { kaligadhsDB, settingsDB } from '../db';
-import { generateUUID, ITEM_CATEGORIES, DEFAULT_MAKING_COSTS } from '../utils';
-import { Modal, FormGroup, SectionHeader, Badge } from '../components/UI';
+import { useState } from 'react';
+import { Plus, Trash2, Edit2, Check, X, Store, LogOut, Lock, Eye, EyeOff } from 'lucide-react';
+import { settingsDB } from '../db';
+import { useAuth } from '../context/AuthContext';
 
-export default function Settings() {
-  const [kaligadhs, setKaligadhs] = useState([]);
-  const [costs, setCosts] = useState(DEFAULT_MAKING_COSTS);
-  const [showAdd, setShowAdd] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [editingCosts, setEditingCosts] = useState(false);
-  const [draftCosts, setDraftCosts] = useState({});
-  const [form, setForm] = useState({ name: '', specialties: [] });
+export default function Settings({ itemCategories, onItemCategoriesChange }) {
+  const { user, updateUser, logout } = useAuth();
 
-  useEffect(() => { load(); }, []);
+  // ── Account section ──────────────────────────────────────────────────────────
+  const [shopNameDraft, setShopNameDraft] = useState('');
+  const [editingShop, setEditingShop] = useState(false);
 
-  async function load() {
-    const ks = await kaligadhsDB.getAll();
-    setKaligadhs(ks);
-    const savedCosts = await settingsDB.get('makingCosts');
-    if (savedCosts) setCosts(savedCosts);
+  function startEditShop() {
+    setShopNameDraft(user?.shopName || '');
+    setEditingShop(true);
   }
 
-  async function saveKaligadh() {
-    if (!form.name.trim() || form.specialties.length === 0) return alert('Name and at least one specialty required.');
-    const k = editing
-      ? { ...editing, name: form.name, specialties: form.specialties }
-      : { id: generateUUID(), name: form.name.trim(), specialties: form.specialties, totalDue: 0, lastPaidDate: null };
-    await kaligadhsDB.save(k);
-    setShowAdd(false); setEditing(null); setForm({ name: '', specialties: [] });
-    load();
+  function saveShopName() {
+    const name = shopNameDraft.trim();
+    if (!name) return;
+    updateUser({ shopName: name });
+    setEditingShop(false);
   }
 
-  async function deleteKaligadh(id) {
-    if (window.confirm('Delete this Kaligadh?')) { await kaligadhsDB.delete(id); load(); }
+  // ── Change Password section ──────────────────────────────────────────────────
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [pwMsg, setPwMsg] = useState(null);
+
+  function changePassword(e) {
+    e.preventDefault();
+    setPwMsg(null);
+
+    if (!user?.password) {
+      setPwMsg({ type: 'err', text: 'No password set. Please register first.' });
+      return;
+    }
+    if (currentPw !== user.password) {
+      setPwMsg({ type: 'err', text: 'Current password is incorrect.' });
+      return;
+    }
+    if (newPw !== confirmPw) {
+      setPwMsg({ type: 'err', text: 'New passwords do not match.' });
+      return;
+    }
+    if (newPw.length < 6) {
+      setPwMsg({ type: 'err', text: 'Password must be at least 6 characters.' });
+      return;
+    }
+
+    updateUser({ password: newPw });
+    setCurrentPw('');
+    setNewPw('');
+    setConfirmPw('');
+    setPwMsg({ type: 'ok', text: 'Password changed successfully.' });
   }
 
-  function openEdit(k) {
-    setEditing(k);
-    setForm({ name: k.name, specialties: k.specialties });
-    setShowAdd(true);
+  // ── Item categories edit state ────────────────────────────────────────────────
+  const [draftCategories, setDraftCategories] = useState([]);
+  const [editingCategories, setEditingCategories] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemCost, setNewItemCost] = useState('');
+
+  function startEditCategories() {
+    setDraftCategories(itemCategories.map(i => ({ ...i })));
+    setNewItemName('');
+    setNewItemCost('');
+    setEditingCategories(true);
   }
 
-  async function saveCosts() {
-    await settingsDB.set('makingCosts', draftCosts);
-    setCosts(draftCosts);
-    setEditingCosts(false);
+  function cancelEditCategories() {
+    setEditingCategories(false);
+    setNewItemName('');
+    setNewItemCost('');
   }
 
-  const toggleSpecialty = (s) => {
-    const cur = form.specialties;
-    setForm({ ...form, specialties: cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s] });
-  };
+  async function saveCategories() {
+    await settingsDB.set('itemCategories', draftCategories);
+    onItemCategoriesChange(draftCategories);
+    setEditingCategories(false);
+    setNewItemName('');
+    setNewItemCost('');
+  }
+
+  function addNewItem() {
+    const name = newItemName.trim();
+    if (!name) return;
+    if (draftCategories.find(i => i.name.toLowerCase() === name.toLowerCase())) {
+      return alert('An item with that name already exists.');
+    }
+    setDraftCategories(prev => [...prev, { name, makingCost: Number(newItemCost) || 0 }]);
+    setNewItemName('');
+    setNewItemCost('');
+  }
+
+  function removeDraftItem(name) {
+    setDraftCategories(prev => prev.filter(i => i.name !== name));
+  }
+
+  function updateDraftCost(name, cost) {
+    setDraftCategories(prev => prev.map(i => i.name === name ? { ...i, makingCost: Number(cost) || 0 } : i));
+  }
 
   return (
     <div>
       <div className="page-header">
         <h2>Settings</h2>
-        <p>Configure workers and making costs before creating orders</p>
+        <p>Manage your account and shop configuration</p>
       </div>
       <div className="page-body">
 
-        {/* Making Costs */}
+        {/* Account */}
+        <div className="card card-pad mb-6">
+          <div className="flex items-center gap-2 mb-4" style={{ borderBottom: '1px solid var(--paper-2)', paddingBottom: 14 }}>
+            <Store size={17} style={{ color: 'var(--accent)' }} />
+            <div style={{ fontFamily: 'DM Serif Display', fontSize: 18 }}>Account</div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div className="text-sm text-muted" style={{ marginBottom: 2 }}>Email</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{user?.email}</div>
+          </div>
+
+          <div>
+            <div className="text-sm text-muted" style={{ marginBottom: 6 }}>Shop Name</div>
+            {!editingShop ? (
+              <div className="flex items-center gap-3">
+                <span style={{ fontWeight: 600, fontSize: 15 }}>{user?.shopName || '—'}</span>
+                <button className="btn btn-ghost btn-sm" onClick={startEditShop}><Edit2 size={13} /> Edit</button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  className="form-input"
+                  style={{ maxWidth: 280 }}
+                  value={shopNameDraft}
+                  onChange={e => setShopNameDraft(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && saveShopName()}
+                  autoFocus
+                  placeholder="e.g. Ram Tailoring House"
+                />
+                <button className="btn btn-primary btn-sm" onClick={saveShopName}>
+                  <Check size={13} /> Save
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setEditingShop(false)}>
+                  <X size={13} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Change Password */}
+        <div className="card card-pad mb-6">
+          <div className="flex items-center gap-2 mb-4" style={{ borderBottom: '1px solid var(--paper-2)', paddingBottom: 14 }}>
+            <Lock size={17} style={{ color: 'var(--accent)' }} />
+            <div style={{ fontFamily: 'DM Serif Display', fontSize: 18 }}>Change Password</div>
+          </div>
+
+          <form onSubmit={changePassword} style={{ maxWidth: 360 }}>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Current Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  className="form-input"
+                  type={showPw ? 'text' : 'password'}
+                  placeholder="Enter current password"
+                  value={currentPw}
+                  onChange={e => { setCurrentPw(e.target.value); setPwMsg(null); }}
+                  required
+                  style={{ paddingRight: 40 }}
+                />
+                <button type="button" onClick={() => setShowPw(v => !v)}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#A8A29E', display: 'flex' }}>
+                  {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>New Password</label>
+              <input
+                className="form-input"
+                type={showPw ? 'text' : 'password'}
+                placeholder="Min. 6 characters"
+                value={newPw}
+                onChange={e => { setNewPw(e.target.value); setPwMsg(null); }}
+                required
+              />
+            </div>
+
+            <div style={{ marginBottom: 18 }}>
+              <label style={labelStyle}>Confirm New Password</label>
+              <input
+                className="form-input"
+                type={showPw ? 'text' : 'password'}
+                placeholder="Repeat new password"
+                value={confirmPw}
+                onChange={e => { setConfirmPw(e.target.value); setPwMsg(null); }}
+                required
+              />
+            </div>
+
+            {pwMsg && (
+              <div style={{ marginBottom: 14, fontSize: 13, padding: '9px 12px', borderRadius: 8,
+                color: pwMsg.type === 'ok' ? '#15803D' : '#DC2626',
+                background: pwMsg.type === 'ok' ? '#F0FDF4' : '#FEF2F2',
+                border: `1px solid ${pwMsg.type === 'ok' ? '#BBF7D0' : '#FECACA'}`,
+              }}>
+                {pwMsg.text}
+              </div>
+            )}
+
+            <button className="btn btn-primary btn-sm" type="submit">
+              <Lock size={13} /> Change Password
+            </button>
+          </form>
+        </div>
+
+        {/* Sign Out */}
+        <div className="card card-pad mb-6">
+          <div className="flex items-center gap-2 mb-3" style={{ borderBottom: '1px solid var(--paper-2)', paddingBottom: 14 }}>
+            <LogOut size={17} style={{ color: 'var(--red)' }} />
+            <div style={{ fontFamily: 'DM Serif Display', fontSize: 18 }}>Sign Out</div>
+          </div>
+          <p className="text-sm text-muted" style={{ marginBottom: 14 }}>
+            You will be signed out of Tailor Manager on this device.
+          </p>
+          <button
+            className="btn btn-sm"
+            onClick={logout}
+            style={{ background: '#FEF2F2', color: '#DC2626', border: '1.5px solid #FECACA', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <LogOut size={13} /> Sign Out
+          </button>
+        </div>
+
+        {/* Item Categories */}
         <div className="card card-pad mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <div style={{ fontFamily: 'DM Serif Display', fontSize: 18 }}>Making Costs</div>
-              <div className="text-sm text-muted mt-1">Default cost per item category</div>
+              <div style={{ fontFamily: 'DM Serif Display', fontSize: 18 }}>Item Categories</div>
+              <div className="text-sm text-muted mt-1">Manage stitching items and their default making costs</div>
             </div>
-            {!editingCosts
-              ? <button className="btn btn-ghost btn-sm" onClick={() => { setDraftCosts({ ...costs }); setEditingCosts(true); }}><Edit2 size={13} /> Edit</button>
+            {!editingCategories
+              ? <div className="flex gap-2">
+                  <button className="btn btn-accent btn-sm" onClick={startEditCategories}><Plus size={13} /> Add</button>
+                  <button className="btn btn-ghost btn-sm" onClick={startEditCategories}><Edit2 size={13} /> Edit</button>
+                </div>
               : <div className="flex gap-2">
-                  <button className="btn btn-ghost btn-sm" onClick={() => setEditingCosts(false)}><X size={13} /> Cancel</button>
-                  <button className="btn btn-primary btn-sm" onClick={saveCosts}><Check size={13} /> Save</button>
+                  <button className="btn btn-ghost btn-sm" onClick={cancelEditCategories}><X size={13} /> Cancel</button>
+                  <button className="btn btn-primary btn-sm" onClick={saveCategories}><Check size={13} /> Save</button>
                 </div>
             }
           </div>
-          <div className="grid-2">
-            {ITEM_CATEGORIES.map(cat => (
-              <div key={cat} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1.5px solid var(--paper-3)', borderRadius: 8 }}>
-                <span style={{ fontWeight: 600, fontSize: 14 }}>{cat}</span>
-                {editingCosts
-                  ? <input
-                      type="number"
-                      style={{ width: 90, padding: '5px 8px', border: '1.5px solid var(--ink)', borderRadius: 6, fontFamily: 'DM Sans', fontSize: 14, textAlign: 'right' }}
-                      value={draftCosts[cat] || 0}
-                      onChange={e => setDraftCosts({ ...draftCosts, [cat]: Number(e.target.value) })}
-                    />
-                  : <span style={{ fontFamily: 'DM Serif Display', fontSize: 17, color: 'var(--accent)' }}>Rs. {costs[cat]}</span>
-                }
-              </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Kaligadh List */}
-        <div className="card">
-          <div className="flex items-center justify-between" style={{ padding: '18px 20px', borderBottom: '1px solid var(--paper-3)' }}>
-            <div>
-              <div style={{ fontFamily: 'DM Serif Display', fontSize: 18 }}>Kaligadh (Workers)</div>
-              <div className="text-sm text-muted mt-1">{kaligadhs.length} worker{kaligadhs.length !== 1 ? 's' : ''} registered</div>
-            </div>
-            <button className="btn btn-primary btn-sm" onClick={() => { setEditing(null); setForm({ name: '', specialties: [] }); setShowAdd(true); }}>
-              <Plus size={14} /> Add Worker
-            </button>
-          </div>
-
-          {kaligadhs.length === 0
-            ? <div className="empty-state"><p>No workers added yet. Add your first Kaligadh above.</p></div>
-            : <table>
-                <thead><tr>
-                  <th>Name</th>
-                  <th>Specialties</th>
-                  <th>Total Due</th>
-                  <th></th>
-                </tr></thead>
-                <tbody>
-                  {kaligadhs.map(k => (
-                    <tr key={k.id}>
-                      <td style={{ fontWeight: 600 }}>{k.name}</td>
-                      <td>{k.specialties.map(s => <span key={s} className="badge badge-blue" style={{ marginRight: 4 }}>{s}</span>)}</td>
-                      <td style={{ fontFamily: 'DM Serif Display', color: k.totalDue > 0 ? 'var(--accent)' : 'var(--ink-3)' }}>Rs. {k.totalDue || 0}</td>
-                      <td>
-                        <div className="flex gap-2" style={{ justifyContent: 'flex-end' }}>
-                          <button className="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); openEdit(k); }}><Edit2 size={13} /></button>
-                          <button className="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); deleteKaligadh(k.id); }} style={{ color: 'var(--red)' }}><Trash2 size={13} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-          }
-        </div>
-      </div>
-
-      {showAdd && (
-        <Modal
-          title={editing ? 'Edit Kaligadh' : 'Add Kaligadh'}
-          onClose={() => { setShowAdd(false); setEditing(null); }}
-          footer={<>
-            <button className="btn btn-ghost" onClick={() => { setShowAdd(false); setEditing(null); }}>Cancel</button>
-            <button className="btn btn-primary" onClick={saveKaligadh}>Save</button>
-          </>}
-        >
-          <FormGroup label="Full Name" required>
-            <input className="form-input" placeholder="e.g. Ramesh Thapa" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-          </FormGroup>
-          <FormGroup label="Specialties" required hint="Select all categories this worker can handle">
-            <div className="checkbox-group">
-              {ITEM_CATEGORIES.map(s => (
-                <div key={s} className={`checkbox-item ${form.specialties.includes(s) ? 'checked' : ''}`} onClick={() => toggleSpecialty(s)}>{s}</div>
+          {!editingCategories ? (
+            <div className="grid-2">
+              {itemCategories.map(cat => (
+                <div key={cat.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1.5px solid var(--paper-3)', borderRadius: 8 }}>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{cat.name}</span>
+                  <span style={{ fontFamily: 'DM Serif Display', fontSize: 17, color: 'var(--accent)' }}>Rs. {cat.makingCost}</span>
+                </div>
               ))}
             </div>
-          </FormGroup>
-        </Modal>
-      )}
+          ) : (
+            <div>
+              {draftCategories.map(cat => (
+                <div key={cat.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--paper-2)' }}>
+                  <span style={{ flex: 1, fontWeight: 600, fontSize: 14 }}>{cat.name}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    style={{ width: 100, padding: '5px 8px', border: '1.5px solid var(--paper-3)', borderRadius: 6, fontFamily: 'DM Sans', fontSize: 14, textAlign: 'right' }}
+                    value={cat.makingCost}
+                    onChange={e => updateDraftCost(cat.name, e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ color: 'var(--red)', padding: '4px 8px' }}
+                    onClick={() => removeDraftItem(cat.name)}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+
+              {/* Add new item row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 12, marginTop: 4 }}>
+                <input
+                  className="form-input"
+                  placeholder="Item name (e.g. Bhoto)"
+                  style={{ flex: 1 }}
+                  value={newItemName}
+                  onChange={e => setNewItemName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addNewItem()}
+                />
+                <input
+                  type="number"
+                  min="0"
+                  className="form-input"
+                  placeholder="Cost"
+                  style={{ width: 100, textAlign: 'right' }}
+                  value={newItemCost}
+                  onChange={e => setNewItemCost(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addNewItem()}
+                />
+                <button type="button" className="btn btn-primary btn-sm" onClick={addNewItem}>
+                  <Plus size={13} /> Add
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+      </div>
     </div>
   );
 }
+
+const labelStyle = {
+  display: 'block',
+  fontSize: 12,
+  fontWeight: 700,
+  color: '#44403C',
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  marginBottom: 6,
+};

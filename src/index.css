@@ -527,3 +527,253 @@ tbody tr { transition: background 0.1s; cursor: pointer; }
 .font-bold { font-weight: 700; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+/* ─── DEALER PAYMENT MODULE ─── */
+.badge-red { background: var(--red-light); color: var(--red); border: 1px solid #FECACA; }
+.badge-purple { background: #F5F3FF; color: #5B21B6; border: 1px solid #DDD6FE; }
+
+.alert-danger { background: var(--red-light); color: var(--red); border: 1px solid #FECACA; }
+
+.dealer-row-premium { background: #FFFBEB !important; }
+.dealer-row-overdue td { background: #FEF2F2 !important; }
+.dealer-row-premium.dealer-row-overdue td { background: #FEF2F2 !important; }
+
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.priority-premium {
+  background: #FFFBEB;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+}
+
+.priority-regular {
+  background: var(--paper-2);
+  color: var(--ink-4);
+  border: 1px solid var(--paper-3);
+}
+
+.payment-progress-bar {
+  height: 5px;
+  background: var(--paper-2);
+  border-radius: 4px;
+  overflow: hidden;
+  width: 80px;
+}
+
+.payment-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.alert-banner-overdue {
+  background: var(--red-light);
+  color: var(--red);
+  border: 1px solid #FECACA;
+}
+
+.alert-banner-premium {
+  background: #FFFBEB;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+}
+
+.alert-banner-info {
+  background: var(--blue-light);
+  color: var(--blue);
+  border: 1px solid var(--blue-border);
+}
+
+.payment-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--paper-2);
+}
+
+.payment-history-item:last-child { border-bottom: none; }
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid var(--paper-3);
+  background: white;
+  color: var(--ink-3);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.filter-chip:hover { border-color: var(--ink-3); color: var(--ink-2); }
+
+.filter-chip.active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: white;
+}
+
+.filter-chip.active-red {
+  border-color: var(--red);
+  background: var(--red-light);
+  color: var(--red);
+}
+
+.filter-chip.active-green {
+  border-color: var(--green);
+  background: var(--green-light);
+  color: var(--green);
+}
+
+.filter-chip.active-amber {
+  border-color: var(--amber);
+  background: var(--amber-light);
+  color: var(--amber);
+}
+
+.filter-chip.active-premium {
+  border-color: #D97706;
+  background: #FFFBEB;
+  color: #92400E;
+}
+
+.sort-select {
+  padding: 6px 12px;
+  border: 1.5px solid var(--paper-3);
+  border-radius: var(--radius-sm);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  background: white;
+  cursor: pointer;
+  outline: none;
+}
+
+.sort-select:focus { border-color: var(--ink); }
+
+.due-date-cell { font-size: 12px; }
+.due-date-overdue { color: var(--red); font-weight: 700; }
+.due-date-urgent { color: var(--amber); font-weight: 600; }
+.due-date-normal { color: var(--ink-2); font-weight: 500; }
+.due-date-sub { font-size: 11px; margin-top: 2px; }
+
+/* ─── SALARY PAGE ─── */
+.salary-card {
+  background: white;
+  border: 1px solid var(--paper-3);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.salary-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--paper-2);
+  background: var(--paper-2);
+}
+
+.salary-stats-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  border-bottom: 1px solid var(--paper-2);
+}
+
+.salary-stat-cell {
+  padding: 14px 16px;
+  border-right: 1px solid var(--paper-2);
+  text-align: center;
+}
+.salary-stat-cell:last-child { border-right: none; }
+
+.salary-stat-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-4);
+  margin-bottom: 6px;
+}
+
+.salary-stat-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+}
+
+.salary-cell-paid { background: var(--green-light); }
+.salary-cell-due  { background: var(--red-light); }
+
+.salary-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.salary-rate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px dashed var(--paper-3);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.salary-rate-btn:hover { border-color: var(--ink-3); background: var(--paper-2); }
+
+.prev-due-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.prev-due-btn:hover { opacity: 0.8; }
+.prev-due-has-balance { background: var(--red-light); color: var(--red); border: 1px solid #FECACA; }
+.prev-due-clear       { background: var(--paper-2);   color: var(--ink-4); border: 1px solid var(--paper-3); }
