@@ -2,51 +2,48 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
-// ── Authenticated fetch helper ────────────────────────────────────────────────
-// Automatically attaches the stored JWT to every request and JSON-stringifies body.
-export function authFetch(url, { body, ...options } = {}) {
-  const token = localStorage.getItem('auth_token');
-  return fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+const USER_KEY = 'tailor_user';
+
+// ── Simple authFetch stub for local mode ─────────────────────────────────────────
+export function authFetch(url, options = {}) {
+  console.log('authFetch called (local mode):', url);
+  return Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({}),
   });
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }) {
-  const [user,    setUser]    = useState(null);   // { email, shopName } or null
-  const [loading, setLoading] = useState(true);   // true while verifying stored token
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // On mount, verify the stored JWT with the server
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    if (!token) { setLoading(false); return; }
-
-    fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(({ user: u }) => setUser(u))
-      .catch(() => localStorage.removeItem('auth_token'))
-      .finally(() => setLoading(false));
+    const stored = localStorage.getItem(USER_KEY);
+    if (stored) {
+      try {
+        setUser(JSON.parse(stored));
+      } catch {
+        localStorage.removeItem(USER_KEY);
+      }
+    }
+    setLoading(false);
   }, []);
 
-  function login(token, userData) {
-    localStorage.setItem('auth_token', token);
+  function login(userData) {
+    localStorage.setItem(USER_KEY, JSON.stringify(userData));
     setUser(userData);
   }
 
   function logout() {
-    localStorage.removeItem('auth_token');
+    localStorage.removeItem(USER_KEY);
     setUser(null);
   }
 
-  // Called after profile update to sync sidebar without re-login
   function updateUser(updates) {
-    setUser(prev => ({ ...prev, ...updates }));
+    const updated = { ...user, ...updates };
+    localStorage.setItem(USER_KEY, JSON.stringify(updated));
+    setUser(updated);
   }
 
   return (

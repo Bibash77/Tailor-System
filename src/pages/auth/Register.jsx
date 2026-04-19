@@ -34,7 +34,7 @@ export default function Register({ onHasAccount }) {
       if (!res.ok) { setError(data.error || 'Registration failed.'); return; }
       login(data.token, data.user);
     } catch {
-      setError('Registration failed. Please check your connection.');
+      setError('Registration failed. Please check your connection and make sure the server is running.');
     } finally {
       setLoading(false);
     }

@@ -344,11 +344,13 @@ export default function NotificationBell({ onNavigate }) {
   const [filter,       setFilter]       = useState('all');
   const [loading,      setLoading]      = useState(false);
   const [syncing,      setSyncing]      = useState(false);
-  const syncedRef = useRef(false);
+  const syncedRef   = useRef(false);
+  const syncingRef  = useRef(false);
 
-  // ── Initial sync + periodic sync ──────────────────────────────────────────
-  const syncNotifications = useCallback(async () => {
-    if (syncing) return;
+  // ── Sync function using ref to avoid stale closure in setInterval ─────────
+  async function syncNotifications() {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
     setSyncing(true);
     try {
       const computed = await computeNotifications();
@@ -367,19 +369,23 @@ export default function NotificationBell({ onNavigate }) {
     } catch (e) {
       console.warn('Notification sync error:', e);
     } finally {
+      syncingRef.current = false;
       setSyncing(false);
     }
-  }, [syncing]);
+  }
+
+  const syncRef = useRef(syncNotifications);
+  syncRef.current = syncNotifications;
 
   useEffect(() => {
     // First sync after a short delay (let IndexedDB settle)
     const t = setTimeout(() => {
-      syncNotifications();
+      syncRef.current();
       syncedRef.current = true;
     }, 2000);
 
     // Re-sync every 10 minutes
-    const interval = setInterval(syncNotifications, 10 * 60 * 1000);
+    const interval = setInterval(() => syncRef.current(), 10 * 60 * 1000);
 
     // Listen for service-worker notification clicks
     function onSwMessage(event) {

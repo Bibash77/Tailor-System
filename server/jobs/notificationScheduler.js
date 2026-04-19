@@ -45,12 +45,18 @@ function initFirebaseAdmin() {
 
 // ─── Send pending push notifications ─────────────────────────────────────────
 async function sendPendingPushes() {
-  if (!admin) return;
+  if (!admin) {
+    console.info('[Notifications] Push skipped — Firebase Admin not initialized (no service account)');
+    return;
+  }
 
   try {
     const db  = getDB();
     const user = await db.collection('users').findOne({});
-    if (!user?.fcmToken) return; // no device registered yet
+    if (!user?.fcmToken) {
+      console.info('[Notifications] Push skipped — no FCM token registered for user');
+      return;
+    }
 
     // Find notifications not yet pushed (limit 10 per cycle to avoid flooding)
     const pending = await db.collection('notifications')
@@ -79,8 +85,8 @@ async function sendPendingPushes() {
             notification: {
               title: n.title,
               body:  n.message,
-              icon:  '/logo192.png',
-              badge: '/logo192.png',
+              icon:  '/favicon.ico',
+              badge: '/favicon.ico',
               tag:   n.dedupKey || n._id.toString(),
               renotify: true,
             },
@@ -134,13 +140,16 @@ async function pruneOldNotifications() {
 function startScheduler() {
   initFirebaseAdmin();
 
-  // Send pending pushes every 15 minutes
-  cron.schedule('*/15 * * * *', sendPendingPushes);
+  // Send pending pushes every 2 minutes
+  cron.schedule('*/2 * * * *', async () => {
+    console.log(`[Notifications] Cron tick at ${new Date().toISOString()}`);
+    await sendPendingPushes();
+  });
 
   // Prune old read notifications every day at 3 AM
   cron.schedule('0 3 * * *', pruneOldNotifications);
 
-  console.log('[Notifications] Scheduler started (push check: every 15 min)');
+  console.log('[Notifications] Scheduler started (push check: every 2 min)');
 }
 
 module.exports = { startScheduler, sendPendingPushes };

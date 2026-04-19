@@ -30,7 +30,7 @@ export default function Login({ onForgot, onRegister }) {
       if (!res.ok) { setError(data.error || 'Login failed.'); return; }
       login(data.token, data.user);
     } catch {
-      setError('Login failed. Please check your connection.');
+      setError('Login failed. Please check your connection and make sure the server is running.');
     } finally {
       setLoading(false);
     }

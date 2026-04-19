@@ -17,7 +17,7 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   const title   = payload.notification?.title || payload.data?.title  || 'Tailor Manager';
   const body    = payload.notification?.body  || payload.data?.message || '';
-  const icon    = '/logo192.png';
+  const icon    = '/favicon.ico';
   const data    = payload.data || {};
 
   self.registration.showNotification(title, {
