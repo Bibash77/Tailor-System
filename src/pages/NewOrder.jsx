@@ -3,6 +3,7 @@ import { Upload, X, Receipt, Search, UserCheck, Calendar } from 'lucide-react';
 import { ordersDB, activityDB } from '../db';
 import { generateId, generateUUID, fileToBase64, todayISO, formatDate } from '../utils';
 import { FormGroup, CheckboxGroup, Avatar } from '../components/UI';
+import { authFetch } from '../context/AuthContext';
 
 function defaultDeliveryDate() {
   const d = new Date();
@@ -99,10 +100,9 @@ export default function NewOrder({ itemCategories, prefill, onSaved, onSaveAndAs
     setPreview(b64);
     // Upload to Cloudinary via backend; falls back to base64 if Cloudinary not configured
     try {
-      const res = await fetch('/api/upload', {
+      const res = await authFetch('/api/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: b64 }),
+        body: { data: b64 },
       });
       const { url } = await res.json();
       setForm(prev => ({ ...prev, billPhoto: url }));

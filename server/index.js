@@ -5,7 +5,20 @@ const { connectDB } = require('./db');
 const requireAuth   = require('./middleware/auth');
 
 const app = express();
-app.use(cors());
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  process.env.FRONTEND_URL, // set this to your Vercel URL in production
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, cb) => {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return cb(null, true);
+    if (ALLOWED_ORIGINS.some(o => origin.startsWith(o))) return cb(null, true);
+    cb(new Error(`CORS: ${origin} not allowed`));
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '20mb' }));
 
 // ── Public routes (no auth required) ─────────────────────────────────────────

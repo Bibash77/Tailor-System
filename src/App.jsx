@@ -7,7 +7,7 @@ import {
 import { openDB, settingsDB } from './db';
 import { ITEM_CATEGORIES, DEFAULT_MAKING_COSTS } from './utils';
 
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider, useAuth, API_BASE } from './context/AuthContext';
 import Login         from './pages/auth/Login';
 import Register      from './pages/auth/Register';
 import ForgotPassword from './pages/auth/ForgotPassword';
@@ -51,7 +51,7 @@ function AuthScreen() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    fetch('/api/auth/status')
+    fetch(API_BASE + '/api/auth/status')
       .then(r => r.json())
       .then(({ hasUser }) => setView(hasUser ? 'login' : 'register'))
       .catch(() => setView('login'))

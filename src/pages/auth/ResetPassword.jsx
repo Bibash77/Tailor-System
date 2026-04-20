@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Eye, EyeOff, CheckCircle, XCircle, Lock, ArrowLeft } from 'lucide-react';
 import AuthCard from './AuthCard';
+import { API_BASE } from '../../context/AuthContext';
 
 export default function ResetPassword({ token, onDone }) {
   const [password, setPassword] = useState('');
@@ -9,8 +10,9 @@ export default function ResetPassword({ token, onDone }) {
   const [status,   setStatus]   = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
   const [message,  setMessage]  = useState('');
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
+    setMessage('');
 
     if (password !== confirm) {
       setStatus('error');
@@ -23,17 +25,30 @@ export default function ResetPassword({ token, onDone }) {
       return;
     }
 
-    // In local mode, just simulate success
     setStatus('loading');
-    setTimeout(() => {
+    try {
+      const res = await fetch(API_BASE + '/api/auth/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setStatus('error');
+        setMessage(data.error || 'Reset failed. The link may have expired.');
+        return;
+      }
       setStatus('success');
-      setMessage('Password reset is not available in local mode.');
-    }, 800);
+      setMessage(data.message || 'Password reset successfully.');
+    } catch {
+      setStatus('error');
+      setMessage('Could not connect to server. Check your connection.');
+    }
   }
 
   if (status === 'success') {
     return (
-      <AuthCard title="Password reset" subtitle="Local mode">
+      <AuthCard title="Password reset" subtitle="You can now sign in with your new password">
         <div style={{ textAlign: 'center', padding: '8px 0 24px' }}>
           <CheckCircle size={52} style={{ color: '#15803D', margin: '0 auto 16px' }} />
           <p style={{ fontSize: 14, color: '#78716C' }}>{message}</p>
@@ -55,7 +70,6 @@ export default function ResetPassword({ token, onDone }) {
       subtitle="Choose a strong password for your account"
     >
       <form onSubmit={handleSubmit}>
-
         <div style={{ marginBottom: 14 }}>
           <label style={labelStyle}>New Password</label>
           <div style={{ position: 'relative' }}>
