@@ -10,7 +10,9 @@ function normalize(doc) {
 
 router.get('/', async (req, res) => {
   try {
-    const docs = await getDB().collection('dealers').find({}).toArray();
+    const filter = {};
+    if (req.query.category) filter.category = req.query.category;
+    const docs = await getDB().collection('dealers').find(filter).toArray();
     res.json(docs.map(normalize));
   } catch (e) {
     res.status(500).json({ error: e.message });
