@@ -2,10 +2,9 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
-// Base URL: empty string in dev (proxy handles it), full URL in production
 export const API_BASE = process.env.REACT_APP_API_URL || '';
 
-// ── Authenticated fetch helper ────────────────────────────────────────────────
+// Attaches JWT token to every request and JSON-stringifies body
 export function authFetch(url, { body, ...options } = {}) {
   const token = localStorage.getItem('auth_token');
   return fetch(API_BASE + url, {
@@ -19,12 +18,11 @@ export function authFetch(url, { body, ...options } = {}) {
   });
 }
 
-// ── Provider ──────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // On mount, verify stored JWT with the server
+  // On mount: verify stored JWT with MongoDB via /api/auth/me
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
     if (!token) { setLoading(false); return; }

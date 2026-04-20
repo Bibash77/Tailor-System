@@ -1,9 +1,6 @@
 const router     = require('express').Router();
 const { getDB }  = require('../db');
 const { ObjectId } = require('mongodb');
-const requireAuth = require('../middleware/auth');
-
-router.use(requireAuth);
 
 // ─── GET /api/notifications/unread-count ─────────────────────────────────────
 router.get('/unread-count', async (req, res) => {
