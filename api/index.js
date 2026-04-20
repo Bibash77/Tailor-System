@@ -38,14 +38,19 @@ app.use(async (req, res, next) => {
   next();
 });
 
-app.use('/api/auth',          require('../server/routes/auth'));
-app.use('/api/orders',        requireAuth, require('../server/routes/orders'));
-app.use('/api/kaligadhs',     requireAuth, require('../server/routes/kaligadhs'));
-app.use('/api/assignments',   requireAuth, require('../server/routes/assignments'));
-app.use('/api/dealers',       requireAuth, require('../server/routes/dealers'));
-app.use('/api/activity',      requireAuth, require('../server/routes/activity'));
-app.use('/api/settings',      requireAuth, require('../server/routes/settings'));
-app.use('/api/upload',        requireAuth, require('../server/routes/upload'));
-app.use('/api/notifications', requireAuth, require('../server/routes/notifications'));
+app.use('/api/auth',              require('../server/routes/auth'));
+app.use('/api/orders',            requireAuth, require('../server/routes/orders'));
+app.use('/api/kaligadhs',         requireAuth, require('../server/routes/kaligadhs'));
+app.use('/api/assignments',       requireAuth, require('../server/routes/assignments'));
+app.use('/api/dealers',           requireAuth, require('../server/routes/dealers'));
+app.use('/api/dealer-payments',   requireAuth, require('../server/routes/dealerPayments'));
+app.use('/api/kaligadh-payments', requireAuth, require('../server/routes/kaligadhPayments'));
+app.use('/api/salary-records',    requireAuth, require('../server/routes/salaryRecords'));
+app.use('/api/salary-payments',   requireAuth, require('../server/routes/salaryPayments'));
+app.use('/api/expenses',          requireAuth, require('../server/routes/expenses'));
+app.use('/api/activity',          requireAuth, require('../server/routes/activity'));
+app.use('/api/settings',          requireAuth, require('../server/routes/settings'));
+app.use('/api/upload',            requireAuth, require('../server/routes/upload'));
+app.use('/api/notifications',     requireAuth, require('../server/routes/notifications'));
 
 module.exports = app;

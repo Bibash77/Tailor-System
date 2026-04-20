@@ -4,7 +4,7 @@ import {
   BookOpen, Settings as SettingsIcon, Receipt, Wallet, BarChart2,
   LogOut,
 } from 'lucide-react';
-import { openDB, settingsDB } from './db';
+import { settingsDB } from './db';
 import { ITEM_CATEGORIES, DEFAULT_MAKING_COSTS } from './utils';
 
 import { AuthProvider, useAuth, API_BASE } from './context/AuthContext';
@@ -90,9 +90,8 @@ function AppShell() {
   const [itemCategories,   setItemCategories]   = useState([]);
 
   useEffect(() => {
-    openDB()
-      .then(async () => {
-        let items = await settingsDB.get('itemCategories');
+    settingsDB.get('itemCategories')
+      .then(async (items) => {
         if (!items) {
           items = ITEM_CATEGORIES.map(name => ({ name, makingCost: DEFAULT_MAKING_COSTS[name] || 0 }));
           await settingsDB.set('itemCategories', items);
