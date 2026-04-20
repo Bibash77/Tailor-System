@@ -50,8 +50,13 @@ export function AuthProvider({ children }) {
     setUser(prev => ({ ...prev, ...updates }));
   }
 
+  function refreshSession(token, userData) {
+    localStorage.setItem('auth_token', token);
+    setUser(userData);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateUser, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );

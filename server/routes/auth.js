@@ -186,6 +186,34 @@ router.patch('/password', guard, async (req, res) => {
   }
 });
 
+// ─── PATCH /api/auth/email ────────────────────────────────────────────────────
+// Protected. Change email (requires current password). Returns a fresh token.
+router.patch('/email', guard, async (req, res) => {
+  try {
+    const { newEmail, currentPassword } = req.body;
+    if (!newEmail || !currentPassword) {
+      return res.status(400).json({ error: 'New email and current password are required.' });
+    }
+
+    const email = newEmail.trim().toLowerCase();
+    const user  = await getDB().collection('users').findOne({ email: req.user.email });
+
+    const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!ok) return res.status(401).json({ error: 'Current password is incorrect.' });
+
+    await getDB().collection('users').updateOne(
+      { _id: user._id },
+      { $set: { email } },
+    );
+
+    const updatedUser = { ...user, email };
+    res.json({ token: signToken(updatedUser), user: publicUser(updatedUser) });
+  } catch (err) {
+    console.error('Change email:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ─── POST /api/auth/forgot ────────────────────────────────────────────────────
 // Public. Sends a password-reset email.
 router.post('/forgot', async (req, res) => {

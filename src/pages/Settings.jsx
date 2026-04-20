@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Store, LogOut, Lock, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, Store, LogOut, Lock, Eye, EyeOff, Mail } from 'lucide-react';
 import { settingsDB } from '../db';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, authFetch } from '../context/AuthContext';
 
 export default function Settings({ itemCategories, onItemCategoriesChange }) {
-  const { user, updateUser, logout } = useAuth();
+  const { user, updateUser, refreshSession, logout } = useAuth();
 
   // ── Account section ──────────────────────────────────────────────────────────
   const [shopNameDraft, setShopNameDraft] = useState('');
@@ -28,33 +28,57 @@ export default function Settings({ itemCategories, onItemCategoriesChange }) {
   const [confirmPw, setConfirmPw] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [pwMsg, setPwMsg] = useState(null);
+  const [pwLoading, setPwLoading] = useState(false);
 
-  function changePassword(e) {
+  async function changePassword(e) {
     e.preventDefault();
     setPwMsg(null);
-
-    if (!user?.password) {
-      setPwMsg({ type: 'err', text: 'No password set. Please register first.' });
-      return;
-    }
-    if (currentPw !== user.password) {
-      setPwMsg({ type: 'err', text: 'Current password is incorrect.' });
-      return;
-    }
     if (newPw !== confirmPw) {
       setPwMsg({ type: 'err', text: 'New passwords do not match.' });
       return;
     }
-    if (newPw.length < 6) {
-      setPwMsg({ type: 'err', text: 'Password must be at least 6 characters.' });
-      return;
+    setPwLoading(true);
+    try {
+      const res = await authFetch('/api/auth/password', {
+        method: 'PATCH',
+        body: { currentPassword: currentPw, newPassword: newPw },
+      });
+      const data = await res.json();
+      if (!res.ok) { setPwMsg({ type: 'err', text: data.error }); return; }
+      setCurrentPw(''); setNewPw(''); setConfirmPw('');
+      setPwMsg({ type: 'ok', text: 'Password changed successfully.' });
+    } catch {
+      setPwMsg({ type: 'err', text: 'Network error. Try again.' });
+    } finally {
+      setPwLoading(false);
     }
+  }
 
-    updateUser({ password: newPw });
-    setCurrentPw('');
-    setNewPw('');
-    setConfirmPw('');
-    setPwMsg({ type: 'ok', text: 'Password changed successfully.' });
+  // ── Change Email section ─────────────────────────────────────────────────────
+  const [newEmail, setNewEmail] = useState('');
+  const [emailPw, setEmailPw] = useState('');
+  const [emailMsg, setEmailMsg] = useState(null);
+  const [emailLoading, setEmailLoading] = useState(false);
+
+  async function changeEmail(e) {
+    e.preventDefault();
+    setEmailMsg(null);
+    setEmailLoading(true);
+    try {
+      const res = await authFetch('/api/auth/email', {
+        method: 'PATCH',
+        body: { newEmail, currentPassword: emailPw },
+      });
+      const data = await res.json();
+      if (!res.ok) { setEmailMsg({ type: 'err', text: data.error }); return; }
+      refreshSession(data.token, data.user);
+      setNewEmail(''); setEmailPw('');
+      setEmailMsg({ type: 'ok', text: 'Email updated successfully.' });
+    } catch {
+      setEmailMsg({ type: 'err', text: 'Network error. Try again.' });
+    } finally {
+      setEmailLoading(false);
+    }
   }
 
   // ── Item categories edit state ────────────────────────────────────────────────
@@ -213,8 +237,56 @@ export default function Settings({ itemCategories, onItemCategoriesChange }) {
               </div>
             )}
 
-            <button className="btn btn-primary btn-sm" type="submit">
-              <Lock size={13} /> Change Password
+            <button className="btn btn-primary btn-sm" type="submit" disabled={pwLoading}>
+              <Lock size={13} /> {pwLoading ? 'Saving…' : 'Change Password'}
+            </button>
+          </form>
+        </div>
+
+        {/* Change Email */}
+        <div className="card card-pad mb-6">
+          <div className="flex items-center gap-2 mb-4" style={{ borderBottom: '1px solid var(--paper-2)', paddingBottom: 14 }}>
+            <Mail size={17} style={{ color: 'var(--accent)' }} />
+            <div style={{ fontFamily: 'DM Serif Display', fontSize: 18 }}>Change Email</div>
+          </div>
+
+          <form onSubmit={changeEmail} style={{ maxWidth: 360 }}>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>New Email</label>
+              <input
+                className="form-input"
+                type="email"
+                placeholder="new@example.com"
+                value={newEmail}
+                onChange={e => { setNewEmail(e.target.value); setEmailMsg(null); }}
+                required
+              />
+            </div>
+
+            <div style={{ marginBottom: 18 }}>
+              <label style={labelStyle}>Current Password</label>
+              <input
+                className="form-input"
+                type="password"
+                placeholder="Confirm with your password"
+                value={emailPw}
+                onChange={e => { setEmailPw(e.target.value); setEmailMsg(null); }}
+                required
+              />
+            </div>
+
+            {emailMsg && (
+              <div style={{ marginBottom: 14, fontSize: 13, padding: '9px 12px', borderRadius: 8,
+                color: emailMsg.type === 'ok' ? '#15803D' : '#DC2626',
+                background: emailMsg.type === 'ok' ? '#F0FDF4' : '#FEF2F2',
+                border: `1px solid ${emailMsg.type === 'ok' ? '#BBF7D0' : '#FECACA'}`,
+              }}>
+                {emailMsg.text}
+              </div>
+            )}
+
+            <button className="btn btn-primary btn-sm" type="submit" disabled={emailLoading}>
+              <Mail size={13} /> {emailLoading ? 'Saving…' : 'Update Email'}
             </button>
           </form>
         </div>
