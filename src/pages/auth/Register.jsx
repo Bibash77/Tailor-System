@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Eye, EyeOff, UserPlus } from 'lucide-react';
 import AuthCard from './AuthCard';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth, API_BASE } from '../../context/AuthContext';
 
 export default function Register({ onHasAccount }) {
   const { login } = useAuth();
@@ -25,7 +25,7 @@ export default function Register({ onHasAccount }) {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(API_BASE + '/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase(), shopName: shopName.trim(), password }),

@@ -2,48 +2,52 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
-const USER_KEY = 'tailor_user';
+export const API_BASE = process.env.REACT_APP_API_URL || '';
 
-// ── Simple authFetch stub for local mode ─────────────────────────────────────────
-export function authFetch(url, options = {}) {
-  console.log('authFetch called (local mode):', url);
-  return Promise.resolve({
-    ok: true,
-    json: () => Promise.resolve({}),
+// Attaches JWT token to every request and JSON-stringifies body
+export function authFetch(url, { body, ...options } = {}) {
+  const token = localStorage.getItem('auth_token');
+  return fetch(API_BASE + url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
 }
 
-// ── Provider ──────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [user,    setUser]    = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // On mount: verify stored JWT with MongoDB via /api/auth/me
   useEffect(() => {
-    const stored = localStorage.getItem(USER_KEY);
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem(USER_KEY);
-      }
-    }
-    setLoading(false);
+    const token = localStorage.getItem('auth_token');
+    if (!token) { setLoading(false); return; }
+
+    fetch(API_BASE + '/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(({ user: u }) => setUser(u))
+      .catch(() => localStorage.removeItem('auth_token'))
+      .finally(() => setLoading(false));
   }, []);
 
-  function login(userData) {
-    localStorage.setItem(USER_KEY, JSON.stringify(userData));
+  function login(token, userData) {
+    localStorage.setItem('auth_token', token);
     setUser(userData);
   }
 
   function logout() {
-    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem('auth_token');
     setUser(null);
   }
 
   function updateUser(updates) {
-    const updated = { ...user, ...updates };
-    localStorage.setItem(USER_KEY, JSON.stringify(updated));
-    setUser(updated);
+    setUser(prev => ({ ...prev, ...updates }));
   }
 
   return (
