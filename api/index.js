@@ -39,6 +39,7 @@ app.use(async (req, res, next) => {
 });
 
 app.use('/api/auth',              require('../server/routes/auth'));
+app.use('/api/scan',              requireAuth, require('../server/routes/scan'));
 app.use('/api/orders',            requireAuth, require('../server/routes/orders'));
 app.use('/api/kaligadhs',         requireAuth, require('../server/routes/kaligadhs'));
 app.use('/api/assignments',       requireAuth, require('../server/routes/assignments'));

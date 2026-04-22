@@ -25,6 +25,7 @@ app.use(express.json({ limit: '20mb' }));
 
 // ── Public routes ─────────────────────────────────────────────────────────────
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/scan', requireAuth, require('./routes/scan'));
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // ── Protected routes (JWT required) ──────────────────────────────────────────

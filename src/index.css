@@ -777,3 +777,6 @@ tbody tr { transition: background 0.1s; cursor: pointer; }
 .prev-due-btn:hover { opacity: 0.8; }
 .prev-due-has-balance { background: var(--red-light); color: var(--red); border: 1px solid #FECACA; }
 .prev-due-clear       { background: var(--paper-2);   color: var(--ink-4); border: 1px solid var(--paper-3); }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; display: inline-block; }

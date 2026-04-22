@@ -4,6 +4,7 @@ import { ordersDB, activityDB } from '../db';
 import { generateId, generateUUID, fileToBase64, todayISO, formatDate } from '../utils';
 import { FormGroup, CheckboxGroup, Avatar } from '../components/UI';
 import { authFetch } from '../context/AuthContext';
+import ScanQueue from '../components/ScanQueue';
 
 function defaultDeliveryDate() {
   const d = new Date();
@@ -171,6 +172,28 @@ export default function NewOrder({ itemCategories, prefill, onSaved, onSaveAndAs
 
   const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
+  function applyScan(extracted) {
+    const knownNames = itemCategories.map(i => i.name.toLowerCase());
+    const matchedItems = (extracted.items || []).filter(i =>
+      knownNames.includes(i.toLowerCase())
+    );
+    setForm(prev => ({
+      ...prev,
+      customerName:  extracted.customerName  || prev.customerName,
+      customerPhone: extracted.customerPhone || prev.customerPhone,
+      billNo:        extracted.billNo        || prev.billNo,
+      totalAmount:   extracted.totalAmount   != null ? String(extracted.totalAmount)   : prev.totalAmount,
+      discount:      extracted.discount      != null ? String(extracted.discount)      : prev.discount,
+      advanceAmount: extracted.advanceAmount != null ? String(extracted.advanceAmount) : prev.advanceAmount,
+      note:          extracted.note          || prev.note,
+      items:         matchedItems.length > 0  ? matchedItems : prev.items,
+      deliveryDate:  extracted.deliveryDate  || prev.deliveryDate,
+      billPhoto:     extracted.billPhoto     || prev.billPhoto,
+    }));
+    if (extracted.billPhoto) setPreview(extracted.billPhoto);
+    setUseExisting(false);
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -179,6 +202,9 @@ export default function NewOrder({ itemCategories, prefill, onSaved, onSaveAndAs
       </div>
       <div className="page-body">
         <div style={{ maxWidth: 700 }}>
+
+          {/* Bill Scanner */}
+          <ScanQueue itemCategories={itemCategories} onApply={applyScan} />
 
           {/* Customer Info */}
           <div className="card card-pad mb-4">
