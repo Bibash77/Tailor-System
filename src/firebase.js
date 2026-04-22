@@ -16,7 +16,7 @@ const VAPID_KEY =
   'BLnCuvZk-jWHuxucvYkwhQYN0_61unY7UViHkMZYlk0Z-LcaaQyoQvrtSmBxJA7kUAosFD25uhCnee0yIr4Iku4';
 
 let app;
-let messaging;
+let messaging = undefined; // undefined = not yet checked, null = unsupported
 
 function getFirebaseApp() {
   if (!app) app = initializeApp(firebaseConfig);
@@ -24,27 +24,30 @@ function getFirebaseApp() {
 }
 
 function getFirebaseMessaging() {
-  if (!messaging) messaging = getMessaging(getFirebaseApp());
+  if (messaging !== undefined) return messaging;
+  try {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      messaging = null;
+      return null;
+    }
+    messaging = getMessaging(getFirebaseApp());
+  } catch {
+    messaging = null;
+  }
   return messaging;
 }
 
-// Request permission and register FCM token with the backend.
-// Returns the token string, or null if permission denied / not supported.
 export async function setupPushNotifications() {
   try {
-    if (!('Notification' in window)) return null;           // not supported
-    if (!('serviceWorker' in navigator)) return null;
+    const m = getFirebaseMessaging();
+    if (!m) return null;
 
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      console.info('Push permission denied — in-app notifications only');
-      return null;
-    }
+    if (permission !== 'granted') return null;
 
-    const token = await getToken(getFirebaseMessaging(), { vapidKey: VAPID_KEY });
+    const token = await getToken(m, { vapidKey: VAPID_KEY });
     if (!token) return null;
 
-    // Store token in backend (best-effort, non-blocking)
     authFetch('/api/notifications/fcm-token', {
       method: 'POST',
       body: { token },
@@ -52,16 +55,16 @@ export async function setupPushNotifications() {
 
     return token;
   } catch (err) {
-    console.warn('FCM setup error:', err.message);
+    console.warn('FCM setup:', err.message);
     return null;
   }
 }
 
-// Listen for foreground push messages (app is open).
-// Returns the unsubscribe function.
 export function onForegroundMessage(callback) {
   try {
-    return onMessage(getFirebaseMessaging(), callback);
+    const m = getFirebaseMessaging();
+    if (!m) return () => {};
+    return onMessage(m, callback);
   } catch {
     return () => {};
   }
