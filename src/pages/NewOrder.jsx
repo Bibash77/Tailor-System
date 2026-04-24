@@ -53,7 +53,7 @@ export default function NewOrder({ itemCategories, prefill, onSaved, onSaveAndAs
     if (prefill?.fromScan) {
       applyScan(prefill);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line
   }, []);
 
   useEffect(() => {
