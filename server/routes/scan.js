@@ -62,22 +62,36 @@ async function callModel(model, images, prompt) {
     content.push({ type: 'image_url', image_url: { url: dataUrl } });
   }
 
-  const response = await fetch(OPENROUTER_URL, {
-    method:  'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      'HTTP-Referer':  process.env.APP_URL || 'http://localhost:3000',
-      'X-Title':       'Tailor Manager',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content }],
-      response_format: { type: 'json_object' },
-    }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 25_000); // 25s client-side timeout
 
-  if (response.status === 429 || response.status === 402) return { rateLimited: true };
+  let response;
+  try {
+    response = await fetch(OPENROUTER_URL, {
+      method:  'POST',
+      signal:  controller.signal,
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'HTTP-Referer':  process.env.APP_URL || 'http://localhost:3000',
+        'X-Title':       'Tailor Manager',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content }],
+        response_format: { type: 'json_object' },
+      }),
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    // AbortError or network timeout — treat as transient, try next model
+    return { rateLimited: true };
+  }
+  clearTimeout(timer);
+
+  // 429 quota, 402 payment, 504/503/502 gateway timeouts — all try next model
+  if ([429, 402, 503, 504, 502].includes(response.status)) return { rateLimited: true };
+
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`${model} error ${response.status}: ${text.slice(0, 200)}`);
