@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, ShoppingBag, Users, UsersRound, Truck,
   BookOpen, Settings as SettingsIcon, Receipt, Wallet, BarChart2,
-  LogOut,
+  LogOut, ScanLine,
 } from 'lucide-react';
 import { settingsDB } from './db';
 import { ITEM_CATEGORIES, DEFAULT_MAKING_COSTS } from './utils';
@@ -28,12 +28,14 @@ import SettingsPage   from './pages/Settings';
 import ExpensesPage   from './pages/Expenses';
 import SalaryPage     from './pages/Salary';
 import FinancePage    from './pages/Finance';
+import ScanOrders     from './pages/ScanOrders';
 
 import './index.css';
 
 const NAV = [
-  { id: 'dashboard', label: 'Dashboard',  icon: LayoutDashboard },
-  { id: 'orders',    label: 'Orders',     icon: ShoppingBag },
+  { id: 'dashboard',   label: 'Dashboard',  icon: LayoutDashboard },
+  { id: 'scan-orders', label: 'Scan Bill',  icon: ScanLine },
+  { id: 'orders',      label: 'Orders',     icon: ShoppingBag },
   { id: 'customers', label: 'Customers',  icon: UsersRound },
   { id: 'kaligadh',  label: 'Kaligadh',   icon: Users },
   { id: 'dealers',   label: 'Dealers',    icon: Truck },
@@ -139,6 +141,7 @@ function AppShell() {
   } else {
     switch (page) {
       case 'dashboard': content = <Dashboard   onNavigate={setPage} onNavigateOrder={handleNavigateOrder} />; break;
+      case 'scan-orders': content = <ScanOrders itemCategories={itemCategories} />; break;
       case 'orders':    content = <Orders       onNewOrder={() => setNewOrderFlow('new')} onNewOrderFromScan={handleNewOrderFromScan} onAssignOrder={handleAssignOrder} highlightOrderId={highlightOrderId} onHighlightClear={() => setHighlightOrderId(null)} itemCategories={itemCategories} />; break;
       case 'customers': content = <CustomersPage onNewOrderForCustomer={handleNewOrderForCustomer} />; break;
       case 'kaligadh':  content = <KaligadhPage  itemCategories={itemCategories} />; break;

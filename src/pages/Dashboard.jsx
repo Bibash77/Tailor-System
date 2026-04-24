@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, ArrowRight, Download, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { ordersDB, dealersDB, activityDB, expensesDB } from '../db';
+import { ChevronLeft, ChevronRight, ArrowRight, Download, TrendingUp, TrendingDown, Minus, ScanLine } from 'lucide-react';
+import { ordersDB, dealersDB, activityDB, expensesDB, scanQueueDB } from '../db';
 import { formatCurrency, formatDate, monthKey, monthLabel, prevMonthKey, nextMonthKey, entryMonthKey } from '../utils';
 import { PageHelp } from '../components/UI';
 
@@ -246,6 +246,7 @@ export default function Dashboard({ onNavigate, onNavigateOrder }) {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bizName, setBizName] = useState('Tailor Manager');
+  const [scanQuota, setScanQuota] = useState(null);
 
   useEffect(() => { load(); }, []);
 
@@ -261,6 +262,7 @@ export default function Dashboard({ onNavigate, onNavigateOrder }) {
     setActivity(act);
     setExpenses(exps);
     setLoading(false);
+    scanQueueDB.quota().then(setScanQuota).catch(() => {});
   }
 
   // ── Build order reference map (for bill numbers on income entries)
@@ -418,6 +420,29 @@ export default function Dashboard({ onNavigate, onNavigateOrder }) {
             </div>
           ))}
         </div>
+
+        {/* ── SCAN CREDITS ── */}
+        {scanQuota && (
+          <div className="card card-pad mb-6" style={{ display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer' }}
+            onClick={() => onNavigate('scan-orders')}>
+            <div style={{ width: 44, height: 44, borderRadius: 10, background: 'var(--paper-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <ScanLine size={20} style={{ color: 'var(--accent)' }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 5 }}>Bill Scan Credits</div>
+              <div style={{ height: 5, background: 'var(--paper-2)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
+                <div style={{ height: '100%', width: `${Math.min(100, Math.round(((scanQuota.used || 0) / scanQuota.monthlyLimit) * 100))}%`, background: scanQuota.remaining <= 10 ? '#DC2626' : 'var(--green)', borderRadius: 3 }} />
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                {scanQuota.remaining} of {scanQuota.monthlyLimit} scans remaining this month
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontFamily: 'DM Serif Display', fontSize: 22, color: scanQuota.remaining <= 10 ? '#DC2626' : 'var(--accent)' }}>{scanQuota.remaining}</div>
+              <div style={{ fontSize: 10, color: 'var(--ink-4)' }}>left</div>
+            </div>
+          </div>
+        )}
 
         {/* ── INCOME SECTION ── */}
         <SectionPanel

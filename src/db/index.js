@@ -100,3 +100,12 @@ export const expensesDB = {
   save:    (e)   => api('/api/expenses', { method: 'POST', body: e }),
   delete:  (id)  => api(`/api/expenses/${id}`, { method: 'DELETE' }),
 };
+
+
+export const scanQueueDB = {
+  list:    ()         => api('/api/scan-queue'),
+  quota:   ()         => api('/api/scan-queue/quota'),
+  scan:    (body)     => authFetch('/api/scan-queue', { method: 'POST', body }).then(r => r.json()),
+  confirm: (id, body) => api(`/api/scan-queue/${id}/confirm`, { method: 'POST', body }),
+  discard: (id)       => api(`/api/scan-queue/${id}`, { method: 'DELETE' }),
+};
