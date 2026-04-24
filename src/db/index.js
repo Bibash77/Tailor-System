@@ -35,6 +35,7 @@ export const assignmentsDB = {
   getAll:        ()           => api('/api/assignments'),
   getById:       (id)         => api(`/api/assignments/${id}`),
   save:          (a)          => api('/api/assignments', { method: 'POST', body: a }),
+  delete:        (id)         => api(`/api/assignments/${id}`, { method: 'DELETE' }),
   getByOrder:    (orderId)    => api(`/api/assignments${q({ orderId })}`),
   getByKaligadh: (kaligadhId) => api(`/api/assignments${q({ kaligadhId })}`),
 };

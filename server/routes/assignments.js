@@ -44,4 +44,13 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.delete('/:id', async (req, res) => {
+  try {
+    await getDB().collection('assignments').deleteOne({ _id: req.params.id });
+    res.json({ deleted: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

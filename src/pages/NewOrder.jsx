@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, X, Receipt, Search, UserCheck, Calendar } from 'lucide-react';
+import { Upload, X, Receipt, Search, UserCheck, Calendar, ArrowLeft } from 'lucide-react';
 import { ordersDB, activityDB } from '../db';
 import { generateId, generateUUID, fileToBase64, todayISO, formatDate } from '../utils';
 import { FormGroup, CheckboxGroup, Avatar } from '../components/UI';
@@ -22,7 +22,7 @@ function deriveCustomers(orders) {
   return Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export default function NewOrder({ itemCategories, prefill, onSaved, onSaveAndAssign }) {
+export default function NewOrder({ itemCategories, prefill, onSaved, onSaveAndAssign, onCancel }) {
   const [form, setForm] = useState({
     customerName: prefill?.customerName || '',
     customerPhone: prefill?.customerPhone || '',
@@ -47,6 +47,13 @@ export default function NewOrder({ itemCategories, prefill, onSaved, onSaveAndAs
 
   useEffect(() => {
     ordersDB.getAll().then(orders => setExistingCustomers(deriveCustomers(orders)));
+  }, []);
+
+  useEffect(() => {
+    if (prefill?.fromScan) {
+      applyScan(prefill);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -196,9 +203,16 @@ export default function NewOrder({ itemCategories, prefill, onSaved, onSaveAndAs
 
   return (
     <div>
-      <div className="page-header">
-        <h2>New Order</h2>
-        <p>Create a customer order and record bill details</p>
+      <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <button className="btn btn-ghost btn-sm" style={{ marginTop: 4 }} onClick={onCancel}>
+            <ArrowLeft size={15} /> Back
+          </button>
+          <div>
+            <h2>New Order</h2>
+            <p>Create a customer order and record bill details</p>
+          </div>
+        </div>
       </div>
       <div className="page-body">
         <div style={{ maxWidth: 700 }}>
@@ -416,7 +430,7 @@ export default function NewOrder({ itemCategories, prefill, onSaved, onSaveAndAs
 
           {/* Actions */}
           <div className="flex gap-3">
-            <button className="btn btn-ghost btn-lg" onClick={() => window.history.back()}>Cancel</button>
+            <button className="btn btn-ghost btn-lg" onClick={onCancel}>Cancel</button>
             <button className="btn btn-primary btn-lg flex-1" disabled={saving} onClick={handleSave}>
               <Receipt size={16} /> Save Order
             </button>

@@ -46,8 +46,9 @@ app.use('/api/notifications',     requireAuth, require('./routes/notifications')
 const PORT = process.env.PORT || 5000;
 
 connectDB()
-  .then(() => {
+  .then(db => {
     app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
     require('./jobs/notificationScheduler').startScheduler();
+    require('./services/scanTracker').init(db);
   })
   .catch(err => { console.error('Failed to connect to MongoDB:', err); process.exit(1); });

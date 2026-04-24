@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { PageHelp } from '../components/UI';
 import { activityDB, ordersDB, dealersDB } from '../db';
 import { formatCurrency, formatDate } from '../utils';
 
@@ -12,10 +13,13 @@ const SUB_TYPE_LABELS = {
   kaligadhPayment: 'Kaligadh Due Cleared',
 };
 
+const PAGE_SIZE = 50;
+
 export default function Activity({ onNavigateOrder }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter]   = useState('all');
+  const [page, setPage]       = useState(1);
 
   useEffect(() => { load(); }, []);
 
@@ -33,11 +37,21 @@ export default function Activity({ onNavigateOrder }) {
     }
   }
 
-  const filtered = filter === 'all' ? entries : entries.filter(e => e.type === filter);
+  const filtered = useMemo(
+    () => filter === 'all' ? entries : entries.filter(e => e.type === filter),
+    [entries, filter]
+  );
 
-  const totalRevenue = entries.filter(e => e.type === 'revenue').reduce((s, e) => s + e.amount, 0);
-  const totalExpense = entries.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0);
-  const net = totalRevenue - totalExpense;
+  useEffect(() => { setPage(1); }, [filter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated  = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
+
+  const { totalRevenue, totalExpense, net } = useMemo(() => {
+    const rev = entries.filter(e => e.type === 'revenue').reduce((s, e) => s + e.amount, 0);
+    const exp = entries.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0);
+    return { totalRevenue: rev, totalExpense: exp, net: rev - exp };
+  }, [entries]);
 
   return (
     <div>
@@ -46,6 +60,14 @@ export default function Activity({ onNavigateOrder }) {
         <p>Bookkeeping ledger of all financial events</p>
       </div>
       <div className="page-body">
+        <PageHelp id="activity" title="How the Activity Ledger Works" items={[
+          'Every financial event is auto-recorded here — advance payments, balance collections, salary payments, dealer payments, and expenses.',
+          'Revenue entries (+) come from order advances and final balance collection on completion.',
+          'Expense entries (−) come from salary payments, advance given to workers, dealer purchases, and manual expenses.',
+          'Net = Total Revenue − Total Expenses. This is your actual cash flow.',
+          'Click on any order-linked entry to jump directly to that order.',
+          'Nothing is recorded manually here — all entries are created automatically by actions in other pages.',
+        ]} />
 
         {/* Summary */}
         <div className="stats-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', marginBottom: 24 }}>
@@ -90,7 +112,7 @@ export default function Activity({ onNavigateOrder }) {
                   <div style={{ textAlign: 'right' }}>Amount</div>
                   <div style={{ textAlign: 'right' }}>Date</div>
                 </div>
-                {filtered.map(entry => (
+                {paginated.map(entry => (
                   <div
                     key={entry.id}
                     onClick={() => handleClick(entry)}
@@ -143,6 +165,13 @@ export default function Activity({ onNavigateOrder }) {
                     </div>
                   </div>
                 ))}
+                {totalPages > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '12px 16px', borderTop: '1px solid var(--paper-3)', fontSize: 13, color: 'var(--ink-3)' }}>
+                    <button className="btn btn-ghost btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
+                    <span>{page} / {totalPages} <span style={{ color: 'var(--ink-4)', fontSize: 11 }}>({filtered.length} entries)</span></span>
+                    <button className="btn btn-ghost btn-sm" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
+                  </div>
+                )}
               </>
           }
         </div>

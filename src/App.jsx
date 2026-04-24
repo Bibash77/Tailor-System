@@ -111,12 +111,14 @@ function AppShell() {
     return unsub;
   }, [dbReady]);
 
-  function handleOrderSaved()            { setNewOrderFlow(null); setNewOrderPrefill(null); setPage('orders'); }
-  function handleSaveAndAssign(order)    { setNewOrderPrefill(null); setNewOrderFlow({ order, step: 'assign' }); }
-  function handleAssignDone()            { setNewOrderFlow(null); setPage('orders'); }
-  function handleAssignOrder(order)      { setNewOrderFlow({ order, step: 'assign' }); }
-  function handleNewOrderForCustomer(c)  { setNewOrderPrefill({ customerName: c.name, customerPhone: c.phone }); setNewOrderFlow('new'); }
-  function handleNavigateOrder(orderId)  { setHighlightOrderId(orderId); setNewOrderFlow(null); setPage('orders'); }
+  function handleOrderSaved()             { setNewOrderFlow(null); setNewOrderPrefill(null); setPage('orders'); }
+  function handleSaveAndAssign(order)     { setNewOrderPrefill(null); setNewOrderFlow({ order, step: 'assign' }); }
+  function handleAssignDone()             { setNewOrderFlow(null); setPage('orders'); }
+  function handleAssignOrder(order)       { setNewOrderFlow({ order, step: 'assign' }); }
+  function handleNewOrderForCustomer(c)   { setNewOrderPrefill({ customerName: c.name, customerPhone: c.phone }); setNewOrderFlow('new'); }
+  function handleNavigateOrder(orderId)   { setHighlightOrderId(orderId); setNewOrderFlow(null); setPage('orders'); }
+  function handleNewOrderFromScan(scan)   { setNewOrderPrefill({ ...scan, fromScan: true }); setNewOrderFlow('new'); }
+  function handleCancelNewOrder()         { setNewOrderFlow(null); setNewOrderPrefill(null); setPage('orders'); }
 
   if (!dbReady) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#FAFAF9' }}>
@@ -131,13 +133,13 @@ function AppShell() {
 
   let content;
   if (newOrderFlow === 'new') {
-    content = <NewOrder itemCategories={itemCategories} prefill={newOrderPrefill} onSaved={handleOrderSaved} onSaveAndAssign={handleSaveAndAssign} />;
+    content = <NewOrder itemCategories={itemCategories} prefill={newOrderPrefill} onSaved={handleOrderSaved} onSaveAndAssign={handleSaveAndAssign} onCancel={handleCancelNewOrder} />;
   } else if (newOrderFlow?.step === 'assign') {
     content = <AssignKaligadh order={newOrderFlow.order} itemCategories={itemCategories} onDone={handleAssignDone} />;
   } else {
     switch (page) {
       case 'dashboard': content = <Dashboard   onNavigate={setPage} onNavigateOrder={handleNavigateOrder} />; break;
-      case 'orders':    content = <Orders       onNewOrder={() => setNewOrderFlow('new')} onAssignOrder={handleAssignOrder} highlightOrderId={highlightOrderId} onHighlightClear={() => setHighlightOrderId(null)} />; break;
+      case 'orders':    content = <Orders       onNewOrder={() => setNewOrderFlow('new')} onNewOrderFromScan={handleNewOrderFromScan} onAssignOrder={handleAssignOrder} highlightOrderId={highlightOrderId} onHighlightClear={() => setHighlightOrderId(null)} itemCategories={itemCategories} />; break;
       case 'customers': content = <CustomersPage onNewOrderForCustomer={handleNewOrderForCustomer} />; break;
       case 'kaligadh':  content = <KaligadhPage  itemCategories={itemCategories} />; break;
       case 'dealers':   content = <Dealers />; break;

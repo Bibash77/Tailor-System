@@ -1,6 +1,7 @@
 const router     = require('express').Router();
 const { getDB }  = require('../db');
 const { ObjectId } = require('mongodb');
+const { sendTestEmail } = require('../services/mailer');
 
 // ─── GET /api/notifications/unread-count ─────────────────────────────────────
 router.get('/unread-count', async (req, res) => {
@@ -126,6 +127,20 @@ router.patch('/:id/read', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// ─── POST /api/notifications/test-email ──────────────────────────────────────
+router.post('/test-email', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email required' });
+  let shopName;
+  try {
+    const user = await getDB().collection('users').findOne({});
+    shopName = user?.shopName;
+  } catch {}
+  const sent = await sendTestEmail(email, shopName);
+  if (sent) return res.json({ ok: true });
+  res.status(500).json({ error: 'Email send failed — check SMTP settings in environment variables' });
 });
 
 // ─── DELETE /api/notifications/old ───────────────────────────────────────────

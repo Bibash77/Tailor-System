@@ -780,3 +780,9 @@ tbody tr { transition: background 0.1s; cursor: pointer; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; display: inline-block; }
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.skeleton { background: var(--paper-3); border-radius: 4px; animation: skeleton-pulse 1.4s ease-in-out infinite; }

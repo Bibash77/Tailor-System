@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, ArrowRight, Download, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { ordersDB, dealersDB, activityDB, expensesDB } from '../db';
 import { formatCurrency, formatDate, monthKey, monthLabel, prevMonthKey, nextMonthKey, entryMonthKey } from '../utils';
+import { PageHelp } from '../components/UI';
 
 // ─── SPARKLINE ────────────────────────────────────────────────────────────────
 
@@ -393,6 +394,14 @@ export default function Dashboard({ onNavigate, onNavigateOrder }) {
       </div>
 
       <div className="page-body">
+        <PageHelp id="dashboard" title="Dashboard Overview" items={[
+          'This page shows a snapshot of your shop for the selected month — use the arrows to navigate months.',
+          'Revenue = advance + balance payments collected from completed orders.',
+          'Expenses = salary paid to workers + dealer payments + manual expenses.',
+          'Profit = Revenue − Expenses for the selected month.',
+          'Pending Orders shows orders that are In Progress and have remaining balance due.',
+          'Navigate to any section using the left sidebar. All financial data flows automatically from your actions.',
+        ]} />
 
         {/* ── QUICK SUMMARY BAR ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 22 }}>

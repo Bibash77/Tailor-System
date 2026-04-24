@@ -239,7 +239,7 @@ router.post('/forgot', async (req, res) => {
     const resetURL = `${APP_URL}/?resetToken=${token}`;
 
     await mailer.sendMail({
-      from:    `"Tailor Manager" <${process.env.SMTP_USER}>`,
+      from:    `"Tailor Manager" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
       to:      user.email,
       subject: 'Password Reset — Tailor Manager',
       html: `

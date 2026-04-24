@@ -4,7 +4,7 @@ import {
   kaligadhsDB, assignmentsDB, ordersDB, salaryPaymentsDB,
 } from '../db';
 import { generateUUID, formatCurrency, formatDate, applyEdit } from '../utils';
-import { Modal, Avatar, EmptyState, ItemTag, FormGroup, HistoryModal } from '../components/UI';
+import { Modal, Avatar, EmptyState, ItemTag, FormGroup, HistoryModal, PageHelp } from '../components/UI';
 
 // ─── ADVANCE BALANCE HELPER ───────────────────────────────────────────────────
 function computeAdvanceBalance(payments) {
@@ -274,6 +274,14 @@ export default function Kaligadh({ itemCategories = [] }) {
       </div>
 
       <div className="page-body">
+        <PageHelp id="kaligadh" title="How Kaligadh (Workers) Work" items={[
+          'Add all your tailors and workers here. Each worker has specialties — the items they can stitch.',
+          'Assign orders to workers from the Orders page (Eye icon → Assign Kaligadh) or during order creation.',
+          'Salary is auto-calculated from making costs on completed assignments — track it on the Salary page.',
+          'Advance given to a worker here is tracked and recovered when paying their salary.',
+          'Active Orders = orders currently assigned to this worker that are not yet completed.',
+          'Click a worker row to see their full profile, assignment history, and advance records.',
+        ]} />
 
         {/* ── SUMMARY STATS ── */}
         {enriched.length > 0 && (

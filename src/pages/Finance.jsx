@@ -5,7 +5,7 @@ import {
   formatCurrency, formatDate,
   monthKey, monthLabel, prevMonthKey, nextMonthKey, entryMonthKey,
 } from '../utils';
-import { EmptyState } from '../components/UI';
+import { EmptyState, PageHelp } from '../components/UI';
 
 // ─── PDF EXPORT ───────────────────────────────────────────────────────────────
 
@@ -220,6 +220,14 @@ export default function Finance({ onNavigate }) {
       </div>
 
       <div className="page-body">
+        <PageHelp id="finance" title="How Finance Works" items={[
+          'This is a month-by-month double-entry ledger showing all income (credit) and expenses (debit).',
+          'Credit = money received: order advances + balance payments on completion.',
+          'Debit = money paid out: salary, dealer payments, and manual expenses.',
+          'Net = Credit − Debit for the selected month. Positive = profit, Negative = loss.',
+          'All entries here are auto-generated from actions in Orders, Salary, Dealers, and Expenses pages.',
+          'Use the Print/Export button to download a PDF report for any month.',
+        ]} />
 
         {/* ── Summary Cards ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>

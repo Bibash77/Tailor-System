@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Check, X, ArrowUpDown, ChevronLeft, ChevronRight, History } from 'lucide-react';
 import { expensesDB } from '../db';
 import { generateUUID, formatCurrency, formatDate, todayISO, monthKey, monthLabel, prevMonthKey, nextMonthKey, entryMonthKey, applyEdit } from '../utils';
-import { Badge, EmptyState, FormGroup, HistoryModal } from '../components/UI';
+import { Badge, EmptyState, FormGroup, HistoryModal, PageHelp } from '../components/UI';
 
 export const EXPENSE_CATEGORIES = [
   'Transport', 'Materials', 'Rent', 'Utilities', 'Salaries', 'Food & Meals', 'Other',
@@ -149,6 +149,13 @@ export default function Expenses() {
         </div>
       </div>
       <div className="page-body">
+        <PageHelp id="expenses" title="How Expenses Work" items={[
+          'Record any business cost here — rent, materials, transport, utilities, etc.',
+          'Salary payments made from the Salary page are automatically added as expenses (category: Salaries). No need to add them manually.',
+          'Dealer purchases marked as paid also flow into the Activity ledger automatically.',
+          'Set Payment Status to Pending for costs you owe but haven\'t paid yet — they won\'t count as cash out until paid.',
+          'Expenses are filtered by month. Use the arrows to browse past months.',
+        ]} />
 
         {/* Summary */}
         <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 24 }}>

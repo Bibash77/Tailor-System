@@ -9,7 +9,7 @@ import {
   generateUUID, generateBillNo, formatCurrency, formatDate, todayISO,
   computeDealerStatus, getDaysUntilDue, DEALER_CATEGORIES, applyEdit
 } from '../utils';
-import { Modal, SearchBar, Badge, EmptyState, FormGroup, HistoryModal } from '../components/UI';
+import { Modal, SearchBar, Badge, EmptyState, FormGroup, HistoryModal, PageHelp } from '../components/UI';
 
 // ─── STATUS CONFIG ────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -689,6 +689,14 @@ export default function Dealers() {
       </div>
 
       <div className="page-body">
+        <PageHelp id="dealers" title="How Dealers Work" items={[
+          'Add material suppliers (dealers) here. Each dealer has a category, credit limit, and due date.',
+          'Record each purchase from a dealer — set the amount and whether it\'s paid or pending.',
+          'Outstanding Balance = Total Purchases − Total Paid. Overdue = past the due date and still unpaid.',
+          'Paying a dealer records the payment in the Activity ledger as an expense automatically.',
+          'Premium dealers get priority in alert banners — configure the category when adding a dealer.',
+          'Use the alert banners at the top to quickly see overdue and due-soon payments.',
+        ]} />
 
         {/* ─── ALERT BANNERS ─── */}
         {stats.premiumOverdue > 0 && (

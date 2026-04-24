@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ChevronLeft, Plus, ArrowUpDown, Calendar } from 'lucide-react';
 import { ordersDB } from '../db';
 import { formatCurrency, formatDate } from '../utils';
-import { SearchBar, Badge, EmptyState, ItemTag, Avatar } from '../components/UI';
+import { SearchBar, Badge, EmptyState, ItemTag, Avatar, PageHelp } from '../components/UI';
 
 function daysRemaining(dateStr) {
   if (!dateStr) return null;
@@ -218,6 +218,13 @@ export default function CustomersPage({ onNewOrderForCustomer }) {
         <p>Browse customers, order history, and quick actions</p>
       </div>
       <div className="page-body">
+        <PageHelp id="customers" title="How Customers Work" items={[
+          'Customers are automatically derived from your order history — no manual entry needed.',
+          'Each customer groups all orders by their phone number (or name if no phone).',
+          'Total Spent = sum of all order amounts for that customer. Repeat = 2+ orders.',
+          'Click "New Order" on a customer card to pre-fill their name and phone in a new order.',
+          'Customers with no orders will not appear here — create an order first.',
+        ]} />
 
         {customers.length > 0 && (
           <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 24 }}>

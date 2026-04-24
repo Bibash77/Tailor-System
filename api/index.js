@@ -29,8 +29,9 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use(async (req, res, next) => {
   if (!isConnected) {
     try {
-      await connectDB();
+      const db = await connectDB();
       isConnected = true;
+      require('../server/services/scanTracker').init(db);
     } catch (err) {
       return res.status(500).json({ error: 'Database connection failed' });
     }

@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Plus, CheckCircle, Eye, UserCheck, Image, ArrowUpDown, Edit2, History, Trash2 } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Plus, CheckCircle, Eye, UserCheck, Image, ArrowUpDown, Edit2, History, Trash2, ScanLine, Camera, Loader } from 'lucide-react';
 import { ordersDB, activityDB, assignmentsDB, kaligadhsDB } from '../db';
-import { generateUUID, formatCurrency, formatDate, todayISO, applyEdit } from '../utils';
-import { SearchBar, Badge, ItemTag, EmptyState, Modal, FormGroup, HistoryModal } from '../components/UI';
+import { generateUUID, formatCurrency, formatDate, todayISO, applyEdit, fileToBase64 } from '../utils';
+import { SearchBar, Badge, ItemTag, EmptyState, Modal, FormGroup, HistoryModal, PageHelp } from '../components/UI';
+import { authFetch } from '../context/AuthContext';
 
 function daysRemaining(dateStr) {
   if (!dateStr) return null;
@@ -340,17 +341,33 @@ function OrderDetail({ order, onClose, onAssign, onComplete, onEdit, onShowHisto
 }
 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
-export default function Orders({ onNewOrder, onAssignOrder, highlightOrderId, onHighlightClear }) {
-  const [orders, setOrders]     = useState([]);
-  const [filter, setFilter]     = useState('inProgress');
-  const [search, setSearch]     = useState('');
-  const [selected, setSelected] = useState(null);
-  const [editing, setEditing]   = useState(null);
+export default function Orders({ onNewOrder, onNewOrderFromScan, onAssignOrder, highlightOrderId, onHighlightClear, itemCategories = [] }) {
+  const [orders, setOrders]       = useState([]);
+  const [filter, setFilter]       = useState('inProgress');
+  const [search, setSearch]       = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [selected, setSelected]   = useState(null);
+  const [editing, setEditing]     = useState(null);
   const [histOrder, setHistOrder] = useState(null);
-  const [loading, setLoading]   = useState(true);
-  const [sortBy, setSortBy]     = useState('date');
+  const [loading, setLoading]     = useState(true);
+  const [sortBy, setSortBy]       = useState('date');
+  const [page, setPage]           = useState(1);
+  const [scanning, setScanning]   = useState(false);
+  const scanInputRef   = useRef(null);
+  const cameraInputRef = useRef(null);
+
+  const PAGE_SIZE = 25;
 
   useEffect(() => { load(); }, []);
+
+  // Debounce search 250ms
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reset to page 1 when filter/search/sort changes
+  useEffect(() => { setPage(1); }, [filter, debouncedSearch, sortBy]);
 
   useEffect(() => {
     if (highlightOrderId && orders.length > 0) {
@@ -399,16 +416,45 @@ export default function Orders({ onNewOrder, onAssignOrder, highlightOrderId, on
 
   function handleEditSaved(updatedOrder) {
     setEditing(null);
-    // refresh the detail view with updated data
     setSelected(updatedOrder);
     load();
   }
 
-  const filtered = orders
+  async function deleteOrder(order) {
+    if (!window.confirm(`Delete order ${order.id}? This cannot be undone and will not affect financial records.`)) return;
+    const assignments = await assignmentsDB.getByOrder(order.id);
+    await Promise.all(assignments.map(a => assignmentsDB.delete(a.id)));
+    await ordersDB.delete(order.id);
+    setSelected(null);
+    load();
+  }
+
+  async function handleScanFile(file) {
+    if (!file) return;
+    setScanning(true);
+    try {
+      const image = await fileToBase64(file);
+      const r = await authFetch('/api/scan', {
+        method: 'POST',
+        body: { image, itemCategories: itemCategories.map(i => i.name) },
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Scan failed');
+      onNewOrderFromScan({ ...d.extracted, billPhoto: image });
+    } catch (err) {
+      alert('Scan failed: ' + err.message);
+    } finally {
+      setScanning(false);
+      if (scanInputRef.current)  scanInputRef.current.value  = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+    }
+  }
+
+  const filtered = useMemo(() => orders
     .filter(o => {
       if (filter !== 'all' && o.status !== filter) return false;
-      if (search) {
-        const s = search.toLowerCase();
+      if (debouncedSearch) {
+        const s = debouncedSearch.toLowerCase();
         return o.customerName.toLowerCase().includes(s) ||
           o.id.toLowerCase().includes(s) ||
           (o.billNo || '').toLowerCase().includes(s);
@@ -420,27 +466,65 @@ export default function Orders({ onNewOrder, onAssignOrder, highlightOrderId, on
       if (sortBy === 'pcs')      return (b.items?.length || 0) - (a.items?.length || 0);
       if (sortBy === 'delivery') return new Date(a.deliveryDate || '9999-12-31') - new Date(b.deliveryDate || '9999-12-31');
       return new Date(b.createdAt) - new Date(a.createdAt);
-    });
+    }), [orders, filter, debouncedSearch, sortBy]);
 
-  const pending    = orders.filter(o => o.status === 'inProgress');
-  const pendingAmt = pending.reduce((s, o) => s + (o.remainingAmount || 0), 0);
-  const pendingPcs = pending.reduce((s, o) => s + (o.items?.length || 0), 0);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated  = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
+
+  const { pending, pendingAmt, pendingPcs } = useMemo(() => {
+    const pending = orders.filter(o => o.status === 'inProgress');
+    return {
+      pending,
+      pendingAmt: pending.reduce((s, o) => s + (o.remainingAmount || 0), 0),
+      pendingPcs: pending.reduce((s, o) => s + (o.items?.length || 0), 0),
+    };
+  }, [orders]);
 
   return (
     <div>
+      {/* Hidden scan inputs */}
+      <input ref={scanInputRef}   type="file" accept="image/*"                    style={{ display: 'none' }} onChange={e => handleScanFile(e.target.files[0])} />
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => handleScanFile(e.target.files[0])} />
+
       <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
           <h2>Orders</h2>
           <p>Manage all customer orders</p>
         </div>
-        <button className="btn btn-accent btn-lg" style={{ marginTop: 4 }} onClick={onNewOrder}>
-          <Plus size={16} /> New Order
-        </button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <button className="btn btn-ghost btn-lg" disabled={scanning} onClick={() => scanInputRef.current?.click()} title="Scan bill from gallery">
+            {scanning ? <Loader size={15} className="spin" /> : <ScanLine size={15} />}
+            {scanning ? 'Scanning…' : 'Scan'}
+          </button>
+          <button className="btn btn-ghost btn-lg" disabled={scanning} onClick={() => cameraInputRef.current?.click()} title="Take photo to scan">
+            <Camera size={15} />
+          </button>
+          <button className="btn btn-accent btn-lg" onClick={onNewOrder}>
+            <Plus size={16} /> New Order
+          </button>
+        </div>
       </div>
 
       <div className="page-body">
+        <PageHelp id="orders" title="How Orders Work" items={[
+          'Create an order when a customer brings in clothes. Set the total amount, advance paid, and delivery date.',
+          'Advance payments are recorded as income immediately in the Activity ledger.',
+          'Assign orders to Kaligadh workers from the order detail view or the Assign Kaligadh page.',
+          'Mark an order Completed when the customer picks up — remaining balance is recorded as income at that point.',
+          'Deleting an order removes it completely without any financial impact (no income recorded).',
+          'Use Scan Bill to extract order details from a photo automatically using AI.',
+        ]} />
         {/* Summary */}
-        {pending.length > 0 && (
+        {loading ? (
+          <div style={{ padding: '12px 20px', background: 'var(--paper-2)', borderRadius: 10, marginBottom: 20, display: 'flex', gap: 32, alignItems: 'center' }}>
+            {[120, 160, 130].map((w, i) => (
+              <div key={i}>
+                <div className="skeleton" style={{ width: w * 0.6, height: 10, marginBottom: 6 }} />
+                <div className="skeleton" style={{ width: w, height: 22 }} />
+              </div>
+            ))}
+          </div>
+        ) : pending.length > 0 && (
           <div style={{ padding: '12px 20px', background: 'var(--amber-light)', border: '1px solid #FDE68A', borderRadius: 10, marginBottom: 20, display: 'flex', gap: 32, alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Pending Orders</div>
@@ -485,8 +569,20 @@ export default function Orders({ onNewOrder, onAssignOrder, highlightOrderId, on
         </div>
 
         <div className="card">
-          {loading ? <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-3)' }}>Loading...</div>
-          : filtered.length === 0
+          {loading ? (
+            <div style={{ padding: '8px 0' }}>
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} style={{ display: 'flex', gap: 16, padding: '14px 20px', borderBottom: '1px solid var(--paper-2)', alignItems: 'center' }}>
+                  <div className="skeleton" style={{ width: 60,  height: 16 }} />
+                  <div className="skeleton" style={{ width: 100, height: 16 }} />
+                  <div className="skeleton" style={{ width: 70,  height: 16 }} />
+                  <div className="skeleton" style={{ width: 70,  height: 16, marginLeft: 'auto' }} />
+                  <div className="skeleton" style={{ width: 60,  height: 16 }} />
+                  <div className="skeleton" style={{ width: 50,  height: 22, borderRadius: 99 }} />
+                </div>
+              ))}
+            </div>
+          ) : filtered.length === 0
           ? <EmptyState
               icon={<Plus size={32} style={{ marginBottom: 0 }} />}
               title="No orders found"
@@ -507,7 +603,7 @@ export default function Orders({ onNewOrder, onAssignOrder, highlightOrderId, on
                   <th></th>
                 </tr></thead>
                 <tbody>
-                  {filtered.map(o => (
+                  {paginated.map(o => (
                     <tr key={o.id} onClick={() => setSelected(o)}>
                       <td>
                         <span style={{ fontFamily: 'DM Serif Display', fontSize: 15, color: 'var(--accent)' }}>{o.id}</span>
@@ -550,12 +646,23 @@ export default function Orders({ onNewOrder, onAssignOrder, highlightOrderId, on
                               <CheckCircle size={13} /> Done
                             </button>
                           )}
+                          <button className="btn btn-ghost btn-sm" title="Delete order" style={{ color: 'var(--red)' }}
+                            onClick={() => deleteOrder(o)}>
+                            <Trash2 size={13} />
+                          </button>
                         </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '12px 16px', borderTop: '1px solid var(--paper-3)', fontSize: 13, color: 'var(--ink-3)' }}>
+                  <button className="btn btn-ghost btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
+                  <span>{page} / {totalPages} <span style={{ color: 'var(--ink-4)', fontSize: 11 }}>({filtered.length} orders)</span></span>
+                  <button className="btn btn-ghost btn-sm" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
+                </div>
+              )}
             </div>
           }
         </div>

@@ -30,9 +30,20 @@ export function AuthProvider({ children }) {
     fetch(API_BASE + '/api/auth/me', {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(({ user: u }) => setUser(u))
-      .catch(() => localStorage.removeItem('auth_token'))
+      .then(r => {
+        // Only invalidate on explicit auth rejection, not network/server errors
+        if (r.status === 401 || r.status === 403) {
+          localStorage.removeItem('auth_token');
+          return null;
+        }
+        if (r.ok) return r.json();
+        // Server error (500, timeout, cold start) — keep token, try again next load
+        return null;
+      })
+      .then(data => { if (data?.user) setUser(data.user); })
+      .catch(() => {
+        // Network failure (offline, DNS, cold start) — keep token, don't log out
+      })
       .finally(() => setLoading(false));
   }, []);
 

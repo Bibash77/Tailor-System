@@ -1,4 +1,5 @@
-import { X, Search, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
+import { X, Search, CheckCircle, Info } from 'lucide-react';
 import { getItemColor, formatDate, FIELD_LABELS } from '../utils';
 
 const AVATAR_COLORS = [
@@ -211,6 +212,46 @@ export function CheckboxGroup({ options, selected, onChange }) {
           {opt}
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── PAGE HELP BANNER ─────────────────────────────────────────────────────────
+export function PageHelp({ id, title, items }) {
+  const key = `help_dismissed_${id}`;
+  const [open, setOpen] = useState(() => localStorage.getItem(key) !== '1');
+
+  function dismiss() {
+    localStorage.setItem(key, '1');
+    setOpen(false);
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => { localStorage.removeItem(key); setOpen(true); }}
+        style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 16, fontSize: 12, color: 'var(--ink-4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+      >
+        <Info size={12} /> How this page works
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ background: 'var(--blue-light)', border: '1px solid var(--blue-border)', borderRadius: 10, padding: '12px 16px', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 700, color: 'var(--blue)' }}>
+          <Info size={14} /> {title}
+        </div>
+        <button onClick={dismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-4)', padding: 2, display: 'flex' }}>
+          <X size={14} />
+        </button>
+      </div>
+      <ul style={{ paddingLeft: 18, margin: 0 }}>
+        {items.map((item, i) => (
+          <li key={i} style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.6, marginBottom: 2 }}>{item}</li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -15,8 +15,35 @@ const firebaseConfig = {
 const VAPID_KEY =
   'BLnCuvZk-jWHuxucvYkwhQYN0_61unY7UViHkMZYlk0Z-LcaaQyoQvrtSmBxJA7kUAosFD25uhCnee0yIr4Iku4';
 
+// Suppress Firebase messaging errors that escape our try-catch via async/internal paths
+if (typeof window !== 'undefined') {
+  const _origOnError = window.onerror;
+  window.onerror = (msg, src, line, col, err) => {
+    if (typeof msg === 'string' && msg.includes('messaging/unsupported-browser')) return true;
+    return _origOnError ? _origOnError(msg, src, line, col, err) : false;
+  };
+  window.addEventListener('unhandledrejection', e => {
+    if (e?.reason?.code === 'messaging/unsupported-browser') e.preventDefault();
+  });
+}
+
 let app;
-let messaging = undefined; // undefined = not yet checked, null = unsupported
+let messaging = undefined; // undefined = unchecked, null = unsupported
+
+function isFCMSupported() {
+  try {
+    return (
+      'serviceWorker' in navigator &&
+      'PushManager'   in window &&
+      'Notification'  in window &&
+      'indexedDB'     in window &&
+      'fetch'         in window &&
+      navigator.cookieEnabled
+    );
+  } catch {
+    return false;
+  }
+}
 
 function getFirebaseApp() {
   if (!app) app = initializeApp(firebaseConfig);
@@ -25,11 +52,8 @@ function getFirebaseApp() {
 
 function getFirebaseMessaging() {
   if (messaging !== undefined) return messaging;
+  if (!isFCMSupported()) { messaging = null; return null; }
   try {
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-      messaging = null;
-      return null;
-    }
     messaging = getMessaging(getFirebaseApp());
   } catch {
     messaging = null;
@@ -55,7 +79,7 @@ export async function setupPushNotifications() {
 
     return token;
   } catch (err) {
-    console.warn('FCM setup:', err.message);
+    if (!err?.code?.includes('messaging/')) console.warn('FCM setup:', err.message);
     return null;
   }
 }

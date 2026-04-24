@@ -1,16 +1,10 @@
-const router = require('express').Router();
+const router  = require('express').Router();
+const tracker = require('../services/scanTracker');
 
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-router.post('/', async (req, res) => {
-  try {
-    const { image, itemCategories = [] } = req.body;
-    if (!image) return res.status(400).json({ error: 'Image is required' });
-
-    const mimeType = image.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
-    const base64   = image.replace(/^data:image\/\w+;base64,/, '');
-
-    const prompt = `Extract tailor shop order info from this bill image. Return ONLY a JSON object, no markdown:
+function buildPrompt(itemCategories) {
+  return `You are reading a Nepali tailor shop bill or measurement sheet. Extract all visible information and return ONLY valid JSON, no markdown, no explanation.
 
 {
   "customerName": string | null,
@@ -19,49 +13,160 @@ router.post('/', async (req, res) => {
   "totalAmount": number | null,
   "discount": number | null,
   "advanceAmount": number | null,
-  "items": [matched names from categories list only],
+  "remainingAmount": number | null,
   "deliveryDate": "YYYY-MM-DD" | null,
-  "note": string | null
+  "items": [],
+  "note": string | null,
+  "measurements": {
+    "shirt": {
+      "length": number | null,
+      "chest": number | null,
+      "waist": number | null,
+      "hip": number | null,
+      "shoulder": number | null,
+      "lBack": number | null,
+      "sleeve": number | null,
+      "neck": number | null
+    },
+    "pant": {
+      "length": number | null,
+      "waist": number | null,
+      "hip": number | null,
+      "high": number | null,
+      "thigh": number | null,
+      "knee": number | null,
+      "bottom": number | null
+    },
+    "pantDesign": string | null,
+    "shirtDesign": string | null
+  }
 }
 
-Known item categories (only match from this list): ${itemCategories.join(', ')}
+${itemCategories.length > 0
+  ? `Known item categories (prefer matching from this list): ${itemCategories.join(', ')}`
+  : 'items: list all clothing items mentioned (shirt, pant, salwar, dress, coat, etc.)'}
 
 Rules:
-- items: only include exact matches from the categories list above
 - amounts: numbers only, no currency symbols
 - customerPhone: digits only
-- deliveryDate: YYYY-MM-DD format, today is ${new Date().toISOString().split('T')[0]}
-- null for any field not found in the image`;
+- deliveryDate: YYYY-MM-DD; today is ${new Date().toISOString().split('T')[0]}; if only day/month visible (e.g. 01/18) assume current year
+- measurements: decimal values allowed (e.g. 25.5 for 25½), null if not visible
+- pantDesign/shirtDesign: any design notes written on the sheet
+- null for any field not found
+- If this is only a measurement sheet with no billing info, leave billing fields null`;
+}
 
-    const response = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [
-          { text: prompt },
-          { inline_data: { mime_type: mimeType, data: base64 } },
-        ]}],
-        generationConfig: { response_mime_type: 'application/json' },
-      }),
-    });
+async function callModel(model, images, prompt) {
+  const content = [{ type: 'text', text: prompt }];
+  for (const { dataUrl } of images) {
+    content.push({ type: 'image_url', image_url: { url: dataUrl } });
+  }
 
-    if (!response.ok) {
-      const text = await response.text();
-      return res.status(500).json({ error: `Gemini error: ${text}` });
+  const response = await fetch(OPENROUTER_URL, {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'HTTP-Referer':  process.env.APP_URL || 'http://localhost:3000',
+      'X-Title':       'Tailor Manager',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content }],
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (response.status === 429 || response.status === 402) return { rateLimited: true };
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`${model} error ${response.status}: ${text.slice(0, 200)}`);
+  }
+
+  const data = await response.json();
+  return { data };
+}
+
+function parseJSON(text) {
+  try { return JSON.parse(text); } catch {}
+  const m = text.match(/\{[\s\S]*\}/);
+  try { return m ? JSON.parse(m[0]) : {}; } catch { return {}; }
+}
+
+// ─── GET /api/scan/stats ──────────────────────────────────────────────────────
+router.get('/stats', async (req, res) => {
+  try {
+    const [stats, keyInfo] = await Promise.all([
+      Promise.resolve(tracker.getStats()),
+      tracker.fetchKeyInfo(),
+    ]);
+    res.json({ ...stats, keyInfo });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/scan ───────────────────────────────────────────────────────────
+// Body: { image, images: [], itemCategories: [] }
+router.post('/', async (req, res) => {
+  try {
+    const { image, images: extraImages = [], itemCategories = [] } = req.body;
+
+    const rawImages = image ? [image, ...extraImages] : extraImages;
+    if (rawImages.length === 0) return res.status(400).json({ error: 'Image is required' });
+
+    const images = rawImages.map(img => ({
+      dataUrl: img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`,
+    }));
+
+    const prompt      = buildPrompt(itemCategories);
+    let extracted     = null;
+    let lastError     = null;
+    const tried       = new Set();
+
+    // Try up to all models, starting from tracker's current model
+    for (let attempt = 0; attempt < tracker.MODELS.length; attempt++) {
+      const model = tracker.getCurrentModel();
+      if (tried.has(model)) break;
+      tried.add(model);
+
+      const result = await callModel(model, images, prompt).catch(e => ({ error: e }));
+
+      if (result.rateLimited) {
+        tracker.recordRateLimit(model);
+        continue;
+      }
+      if (result.error) {
+        lastError = result.error;
+        continue;
+      }
+
+      const text = result.data?.choices?.[0]?.message?.content || '{}';
+      const cost = result.data?.usage?.cost || 0;
+      const raw  = parseJSON(text);
+
+      // Normalise items — model sometimes returns [{name,quantity}] instead of strings
+      if (Array.isArray(raw.items)) {
+        raw.items = raw.items
+          .map(i => (typeof i === 'string' ? i : i?.name || ''))
+          .filter(Boolean);
+      }
+      // Normalise amounts — ensure numbers, not strings
+      for (const f of ['totalAmount','advanceAmount','remainingAmount','discount']) {
+        if (raw[f] != null) raw[f] = Number(raw[f]) || null;
+      }
+
+      extracted = raw;
+      tracker.recordSuccess(model, cost);
+      break;
     }
 
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-
-    let extracted;
-    try {
-      extracted = JSON.parse(text);
-    } catch {
-      const m = text.match(/\{[\s\S]*\}/);
-      extracted = m ? JSON.parse(m[0]) : {};
+    if (extracted === null) {
+      const msg = lastError?.message || 'All models unavailable. Check OPENROUTER_API_KEY or try again later.';
+      return res.status(503).json({ error: msg });
     }
 
-    res.json({ extracted });
+    res.json({ extracted, _model: tracker.getCurrentModel() });
   } catch (err) {
     console.error('Scan error:', err);
     res.status(500).json({ error: err.message });

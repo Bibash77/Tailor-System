@@ -1,7 +1,16 @@
-import { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Store, LogOut, Lock, Eye, EyeOff, Mail } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Plus, Trash2, Edit2, Check, X, Store, LogOut, Lock, Eye, EyeOff, Mail, Bell, ScanLine, RefreshCw } from 'lucide-react';
 import { settingsDB } from '../db';
 import { useAuth, authFetch } from '../context/AuthContext';
+
+const DEFAULT_NOTIF_SETTINGS = {
+  emailEnabled:       true,
+  notifyEmail:        '',
+  delivery:           { enabled: true,  daysBefore: 3 },
+  payment:            { enabled: true,  daysBefore: 3 },
+  salary:             { enabled: true,  daysBeforeMonthEnd: 5 },
+  finance:            { enabled: true  },
+};
 
 export default function Settings({ itemCategories, onItemCategoriesChange }) {
   const { user, updateUser, refreshSession, logout } = useAuth();
@@ -80,6 +89,80 @@ export default function Settings({ itemCategories, onItemCategoriesChange }) {
       setEmailLoading(false);
     }
   }
+
+  // ── Notification settings ─────────────────────────────────────────────────────
+  const [notifSettings,     setNotifSettings]     = useState(DEFAULT_NOTIF_SETTINGS);
+  const [notifDirty,        setNotifDirty]        = useState(false);
+  const [notifSaving,       setNotifSaving]       = useState(false);
+  const [notifMsg,          setNotifMsg]           = useState(null);
+  const [testEmailLoading,  setTestEmailLoading]  = useState(false);
+
+  useEffect(() => {
+    settingsDB.get('notificationSettings').then(v => {
+      if (v) setNotifSettings({ ...DEFAULT_NOTIF_SETTINGS, ...v });
+    }).catch(() => {});
+  }, []);
+
+  function setNotif(path, value) {
+    setNotifDirty(true);
+    setNotifSettings(prev => {
+      const next = { ...prev };
+      const keys = path.split('.');
+      if (keys.length === 1) { next[keys[0]] = value; }
+      else { next[keys[0]] = { ...prev[keys[0]], [keys[1]]: value }; }
+      return next;
+    });
+  }
+
+  async function saveNotifSettings() {
+    setNotifSaving(true);
+    try {
+      await settingsDB.set('notificationSettings', notifSettings);
+      setNotifDirty(false);
+      setNotifMsg({ type: 'ok', text: 'Notification settings saved.' });
+    } catch {
+      setNotifMsg({ type: 'err', text: 'Failed to save settings.' });
+    } finally {
+      setNotifSaving(false);
+      setTimeout(() => setNotifMsg(null), 3000);
+    }
+  }
+
+  async function sendTestEmail() {
+    if (!notifSettings.notifyEmail) return alert('Enter an email address first.');
+    setTestEmailLoading(true);
+    try {
+      const res = await authFetch('/api/notifications/test-email', {
+        method: 'POST',
+        body: { email: notifSettings.notifyEmail },
+      });
+      const data = await res.json();
+      setNotifMsg(res.ok
+        ? { type: 'ok',  text: 'Test email sent! Check your inbox.' }
+        : { type: 'err', text: data.error || 'Send failed.' });
+    } catch {
+      setNotifMsg({ type: 'err', text: 'Network error.' });
+    } finally {
+      setTestEmailLoading(false);
+      setTimeout(() => setNotifMsg(null), 4000);
+    }
+  }
+
+  // ── Scan usage stats ──────────────────────────────────────────────────────────
+  const [scanStats,        setScanStats]        = useState(null);
+  const [scanStatsLoading, setScanStatsLoading] = useState(false);
+
+  const loadScanStats = useCallback(async () => {
+    setScanStatsLoading(true);
+    try {
+      const res  = await authFetch('/api/scan/stats');
+      const data = await res.json();
+      if (res.ok) setScanStats(data);
+    } catch {}
+    finally { setScanStatsLoading(false); }
+  }, []);
+
+  useEffect(() => { loadScanStats(); }, [loadScanStats]);
 
   // ── Item categories edit state ────────────────────────────────────────────────
   const [draftCategories, setDraftCategories] = useState([]);
@@ -309,6 +392,185 @@ export default function Settings({ itemCategories, onItemCategoriesChange }) {
           </button>
         </div>
 
+        {/* Notification Settings */}
+        <div className="card card-pad mb-6">
+          <div className="flex items-center gap-2 mb-4" style={{ borderBottom: '1px solid var(--paper-2)', paddingBottom: 14 }}>
+            <Bell size={17} style={{ color: 'var(--accent)' }} />
+            <div style={{ fontFamily: 'DM Serif Display', fontSize: 18 }}>Notification Settings</div>
+          </div>
+
+          {/* Email */}
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ ...labelStyle, marginBottom: 10 }}>Email Notifications</div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, cursor: 'pointer' }}>
+              <Toggle checked={notifSettings.emailEnabled} onChange={v => setNotif('emailEnabled', v)} />
+              <span style={{ fontSize: 13, color: 'var(--ink-2)' }}>Send email alerts for important notifications</span>
+            </label>
+            {notifSettings.emailEnabled && (
+              <div style={{ display: 'flex', gap: 8, maxWidth: 420 }}>
+                <input
+                  className="form-input"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={notifSettings.notifyEmail}
+                  onChange={e => setNotif('notifyEmail', e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <button className="btn btn-ghost btn-sm" disabled={testEmailLoading} onClick={sendTestEmail}>
+                  {testEmailLoading ? 'Sending…' : 'Test'}
+                </button>
+              </div>
+            )}
+            <p style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 6 }}>
+              Requires SMTP_HOST, SMTP_USER, SMTP_PASS environment variables. Only high-priority alerts are emailed.
+            </p>
+          </div>
+
+          {/* Delivery */}
+          <NotifRule
+            label="Delivery Reminders"
+            hint="Remind when an order delivery date is approaching"
+            enabled={notifSettings.delivery?.enabled}
+            onToggle={v => setNotif('delivery.enabled', v)}
+            daysLabel="Notify before delivery"
+            days={notifSettings.delivery?.daysBefore}
+            onDays={v => setNotif('delivery.daysBefore', v)}
+          />
+
+          {/* Payment */}
+          <NotifRule
+            label="Dealer Payment Reminders"
+            hint="Remind when a dealer payment is due soon"
+            enabled={notifSettings.payment?.enabled}
+            onToggle={v => setNotif('payment.enabled', v)}
+            daysLabel="Notify before due date"
+            days={notifSettings.payment?.daysBefore}
+            onDays={v => setNotif('payment.daysBefore', v)}
+          />
+
+          {/* Salary */}
+          <NotifRule
+            label="Salary Month-End Reminders"
+            hint="Remind when unpaid salary is pending near month end"
+            enabled={notifSettings.salary?.enabled}
+            onToggle={v => setNotif('salary.enabled', v)}
+            daysLabel="Trigger in last N days of month"
+            days={notifSettings.salary?.daysBeforeMonthEnd}
+            onDays={v => setNotif('salary.daysBeforeMonthEnd', v)}
+          />
+
+          {/* Finance */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--paper-2)' }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>Finance Month-End Summary</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>Pending payables and receivables reminder near month end</div>
+            </div>
+            <Toggle checked={notifSettings.finance?.enabled} onChange={v => setNotif('finance.enabled', v)} />
+          </div>
+
+          {/* Save */}
+          <div style={{ marginTop: 18, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button className="btn btn-primary btn-sm" disabled={!notifDirty || notifSaving} onClick={saveNotifSettings}>
+              <Check size={13} /> {notifSaving ? 'Saving…' : 'Save Settings'}
+            </button>
+            {notifMsg && (
+              <span style={{ fontSize: 13, color: notifMsg.type === 'ok' ? 'var(--green)' : 'var(--red)' }}>
+                {notifMsg.text}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Scan Usage */}
+        <div className="card card-pad mb-6">
+          <div className="flex items-center justify-between mb-4" style={{ borderBottom: '1px solid var(--paper-2)', paddingBottom: 14 }}>
+            <div className="flex items-center gap-2">
+              <ScanLine size={17} style={{ color: 'var(--accent)' }} />
+              <div style={{ fontFamily: 'DM Serif Display', fontSize: 18 }}>Bill Scan (AI)</div>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={loadScanStats} disabled={scanStatsLoading}>
+              <RefreshCw size={13} className={scanStatsLoading ? 'spin' : ''} />
+            </button>
+          </div>
+
+          {scanStats ? (
+            <div>
+              {/* Active model row */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--paper-1)', borderRadius: 8, marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Active Model</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, fontFamily: 'monospace', color: 'var(--accent)' }}>{scanStats.currentModel}</div>
+                </div>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: scanStats.failedToday?.length === scanStats.allModels?.length ? '#DC2626' : '#16A34A', boxShadow: '0 0 6px currentColor' }} />
+              </div>
+
+              {/* Stats grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <StatBox label="Scans Today" value={scanStats.requestsToday} />
+                <StatBox label="Cost Today" value={`$${(scanStats.costToday || 0).toFixed(4)}`} />
+                <StatBox label="Total Scans" value={scanStats.totalRequests} />
+                <StatBox label="Total Cost" value={`$${(scanStats.totalCost || 0).toFixed(4)}`} />
+              </div>
+
+              {/* Failed models today */}
+              {scanStats.failedToday?.length > 0 && (
+                <div style={{ fontSize: 12, color: '#D97706', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 7, padding: '8px 12px', marginBottom: 10 }}>
+                  Quota hit today: {scanStats.failedToday.join(', ')} — switched to next model automatically
+                </div>
+              )}
+
+              {/* Last model switch */}
+              {scanStats.lastSwitch && (
+                <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 10 }}>
+                  Last switch: {scanStats.lastSwitch.from?.split('/')[1]} → {scanStats.lastSwitch.to?.split('/')[1]}
+                  {' · '}{new Date(scanStats.lastSwitch.at).toLocaleTimeString()}
+                </div>
+              )}
+
+              {/* OpenRouter key info */}
+              {scanStats.keyInfo && (
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', borderTop: '1px solid var(--paper-2)', paddingTop: 10, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  <span>Plan: <b>{scanStats.keyInfo.is_free_tier ? 'Free Tier' : 'Paid'}</b></span>
+                  <span>Used (month): <b>${(scanStats.keyInfo.usage_monthly || 0).toFixed(4)}</b></span>
+                  {scanStats.keyInfo.limit != null && (
+                    <span>Credit limit: <b>${scanStats.keyInfo.limit}</b></span>
+                  )}
+                </div>
+              )}
+
+              {/* All models */}
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Model Queue</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {scanStats.allModels?.map((m, i) => {
+                    const isCurrent = m === scanStats.currentModel;
+                    const isFailed  = scanStats.failedToday?.includes(m);
+                    return (
+                      <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                        <span style={{ width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700,
+                          background: isFailed ? '#FEE2E2' : isCurrent ? 'var(--accent)' : 'var(--paper-2)',
+                          color: isFailed ? '#DC2626' : isCurrent ? 'white' : 'var(--ink-3)' }}>
+                          {i + 1}
+                        </span>
+                        <span style={{ fontFamily: 'monospace', color: isFailed ? '#DC2626' : isCurrent ? 'var(--ink-1)' : 'var(--ink-3)',
+                          textDecoration: isFailed ? 'line-through' : 'none' }}>
+                          {m}
+                        </span>
+                        {isCurrent && <span style={{ fontSize: 10, background: '#DCFCE7', color: '#16A34A', padding: '1px 6px', borderRadius: 10, fontWeight: 600 }}>active</span>}
+                        {isFailed  && <span style={{ fontSize: 10, background: '#FEE2E2', color: '#DC2626', padding: '1px 6px', borderRadius: 10 }}>quota hit</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ color: 'var(--ink-4)', fontSize: 13 }}>
+              {scanStatsLoading ? 'Loading…' : 'Could not load scan stats. Check OPENROUTER_API_KEY.'}
+            </div>
+          )}
+        </div>
+
         {/* Item Categories */}
         <div className="card card-pad mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -389,6 +651,67 @@ export default function Settings({ itemCategories, onItemCategoriesChange }) {
         </div>
 
       </div>
+    </div>
+  );
+}
+
+function Toggle({ checked, onChange }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      style={{
+        flexShrink: 0,
+        width: 38, height: 22, borderRadius: 11,
+        background: checked ? 'var(--green)' : 'var(--paper-3)',
+        border: 'none', cursor: 'pointer', position: 'relative',
+        transition: 'background 0.2s',
+      }}
+    >
+      <span style={{
+        position: 'absolute', top: 3,
+        left: checked ? 18 : 3,
+        width: 16, height: 16, borderRadius: '50%',
+        background: 'white',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+        transition: 'left 0.2s',
+      }} />
+    </button>
+  );
+}
+
+function NotifRule({ label, hint, enabled, onToggle, daysLabel, days, onDays }) {
+  return (
+    <div style={{ padding: '12px 0', borderBottom: '1px solid var(--paper-2)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: 13 }}>{label}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{hint}</div>
+        </div>
+        <Toggle checked={enabled} onChange={onToggle} />
+      </div>
+      {enabled && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+          <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{daysLabel}:</span>
+          <input
+            type="number"
+            min={1} max={30}
+            value={days ?? 3}
+            onChange={e => onDays(Math.max(1, Math.min(30, Number(e.target.value) || 1)))}
+            style={{ width: 60, padding: '4px 8px', border: '1.5px solid var(--paper-3)', borderRadius: 6, fontFamily: 'DM Sans', fontSize: 14, textAlign: 'center' }}
+          />
+          <span style={{ fontSize: 12, color: 'var(--ink-4)' }}>days</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatBox({ label, value }) {
+  return (
+    <div style={{ background: 'var(--paper-1)', borderRadius: 8, padding: '10px 14px' }}>
+      <div style={{ fontSize: 11, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontWeight: 700, fontSize: 20, fontFamily: 'DM Serif Display', color: 'var(--ink-1)' }}>{value}</div>
     </div>
   );
 }

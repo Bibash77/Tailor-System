@@ -8,7 +8,7 @@ import {
   generateUUID, formatCurrency, formatDate,
   todayISO, monthKey, monthLabel, prevMonthKey, nextMonthKey,
 } from '../utils';
-import { Modal, Avatar, FormGroup, EmptyState } from '../components/UI';
+import { Modal, Avatar, FormGroup, EmptyState, PageHelp } from '../components/UI';
 
 const WORKERS_PER_PAGE = 8;
 const HISTORY_PAGE_SIZE = 10;
@@ -838,6 +838,15 @@ export default function Salary() {
       </div>
 
       <div className="page-body">
+        <PageHelp id="salary" title="How Salary Works" items={[
+          'Workers earn a making cost per piece when an assigned order is marked Completed — earnings appear in the current month.',
+          '"Net Payable" = This month earned + Previous month due − Advance balance already given.',
+          'Clicking "Pay Now" records the payment as an Expense in the Activity ledger — unpaid amounts carry forward automatically.',
+          '"In Progress" pieces are not yet earned — they count once their order is completed.',
+          'Previous Due shows salary owed from earlier months that was not paid.',
+          'Advance: cash given to a worker before earning — recovered automatically when settling salary.',
+          'Use the Print icon to generate a detailed salary slip for any worker.',
+        ]} />
 
         {/* ── SUMMARY STAT CARDS ── */}
         {workers.length > 0 && (

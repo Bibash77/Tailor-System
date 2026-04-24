@@ -8,11 +8,14 @@ function normalize(doc) {
   return { id: _id, ...rest };
 }
 
-// GET all orders (optionally filter by status)
+// GET all orders — excludes billPhoto (large base64) for list performance
 router.get('/', async (req, res) => {
   try {
     const filter = req.query.status ? { status: req.query.status } : {};
-    const docs = await getDB().collection('orders').find(filter).toArray();
+    const docs = await getDB().collection('orders')
+      .find(filter, { projection: { billPhoto: 0 } })
+      .sort({ createdAt: -1 })
+      .toArray();
     res.json(docs.map(normalize));
   } catch (e) {
     res.status(500).json({ error: e.message });
