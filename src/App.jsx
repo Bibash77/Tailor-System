@@ -13,7 +13,8 @@ import Register       from './pages/auth/Register';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword  from './pages/auth/ResetPassword';
 
-import NotificationBell from './components/NotificationBell';
+import NotificationBell      from './components/NotificationBell';
+import SubscriptionBanner    from './components/SubscriptionBanner';
 import { setupPushNotifications, onForegroundMessage } from './firebase';
 
 import AdminLogin     from './pages/admin/AdminLogin';
@@ -52,25 +53,7 @@ const NAV = [
 // ─── Auth screen ──────────────────────────────────────────────────────────────
 
 function AuthScreen() {
-  const [view,     setView]     = useState(null);
-  const [checking, setChecking] = useState(true);
-
-  useEffect(() => {
-    fetch(API_BASE + '/api/auth/status')
-      .then(r => r.json())
-      .then(({ hasUser }) => setView(hasUser ? 'login' : 'register'))
-      .catch(() => setView('login'))
-      .finally(() => setChecking(false));
-  }, []);
-
-  if (checking) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1C1917' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontFamily: 'DM Serif Display', fontSize: 28, color: 'white', marginBottom: 8 }}>Tailor Manager</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Loading…</div>
-      </div>
-    </div>
-  );
+  const [view, setView] = useState('login');
 
   if (view === 'register') return <Register       onHasAccount={() => setView('login')} />;
   if (view === 'forgot')   return <ForgotPassword onBack={() => setView('login')} />;
@@ -162,7 +145,7 @@ function AppShell() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <aside className="sidebar" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="sidebar-logo">
           <h1 style={{ fontSize: 17, lineHeight: 1.3 }}>{user.shopName || 'Tailor Manager'}</h1>
           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', display: 'block', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -205,7 +188,10 @@ function AppShell() {
         </div>
       </aside>
 
-      <main className="main-content">{content}</main>
+      <main className="main-content" style={{ display: 'flex', flexDirection: 'column' }}>
+        <SubscriptionBanner subscription={user?.subscription} />
+        <div style={{ flex: 1, overflow: 'auto' }}>{content}</div>
+      </main>
     </div>
   );
 }
@@ -224,6 +210,7 @@ function AdminShell() {
   return <AdminDashboard onLogout={handleLogout} />;
 }
 
+
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 function AppContent() {
@@ -236,15 +223,11 @@ function AppContent() {
     return t || null;
   });
 
-  // Admin panel: accessed via ?admin=1 in URL or existing admin_token
-  const [isAdminMode] = useState(() => {
-    const p = new URLSearchParams(window.location.search);
-    if (p.get('admin') === '1') {
-      window.history.replaceState({}, '', window.location.pathname);
-      return true;
-    }
-    return !!localStorage.getItem('admin_token');
-  });
+  // Admin panel: accessed via /admin path or existing admin_token
+  const [isAdminMode] = useState(() =>
+    window.location.pathname.startsWith('/admin') ||
+    !!localStorage.getItem('admin_token')
+  );
 
   if (isAdminMode) return <AdminShell />;
 

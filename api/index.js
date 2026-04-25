@@ -3,6 +3,7 @@ const express    = require('express');
 const cors       = require('cors');
 const { connectDB } = require('../server/db');
 const requireAuth   = require('../server/middleware/auth');
+const subCheck      = require('../server/middleware/subscriptionCheck');
 
 const app = express();
 
@@ -48,18 +49,18 @@ app.use('/api/admin/auth',        adminAuthRouter);
 app.use('/api/admin',             adminGuard, require('../server/routes/admin'));
 app.use('/api/scan',              requireAuth, require('../server/routes/scan'));
 app.use('/api/scan-queue',        requireAuth, require('../server/routes/scanQueue'));
-app.use('/api/orders',            requireAuth, require('../server/routes/orders'));
-app.use('/api/kaligadhs',         requireAuth, require('../server/routes/kaligadhs'));
-app.use('/api/assignments',       requireAuth, require('../server/routes/assignments'));
-app.use('/api/dealers',           requireAuth, require('../server/routes/dealers'));
-app.use('/api/dealer-payments',   requireAuth, require('../server/routes/dealerPayments'));
-app.use('/api/kaligadh-payments', requireAuth, require('../server/routes/kaligadhPayments'));
-app.use('/api/salary-records',    requireAuth, require('../server/routes/salaryRecords'));
-app.use('/api/salary-payments',   requireAuth, require('../server/routes/salaryPayments'));
-app.use('/api/expenses',          requireAuth, require('../server/routes/expenses'));
+app.use('/api/orders',            requireAuth, subCheck, require('../server/routes/orders'));
+app.use('/api/kaligadhs',         requireAuth, subCheck, require('../server/routes/kaligadhs'));
+app.use('/api/assignments',       requireAuth, subCheck, require('../server/routes/assignments'));
+app.use('/api/dealers',           requireAuth, subCheck, require('../server/routes/dealers'));
+app.use('/api/dealer-payments',   requireAuth, subCheck, require('../server/routes/dealerPayments'));
+app.use('/api/kaligadh-payments', requireAuth, subCheck, require('../server/routes/kaligadhPayments'));
+app.use('/api/salary-records',    requireAuth, subCheck, require('../server/routes/salaryRecords'));
+app.use('/api/salary-payments',   requireAuth, subCheck, require('../server/routes/salaryPayments'));
+app.use('/api/expenses',          requireAuth, subCheck, require('../server/routes/expenses'));
 app.use('/api/activity',          requireAuth, require('../server/routes/activity'));
-app.use('/api/settings',          requireAuth, require('../server/routes/settings'));
-app.use('/api/upload',            requireAuth, require('../server/routes/upload'));
+app.use('/api/settings',          requireAuth, subCheck, require('../server/routes/settings'));
+app.use('/api/upload',            requireAuth, subCheck, require('../server/routes/upload'));
 app.use('/api/notifications',     requireAuth, require('../server/routes/notifications'));
 
 module.exports = app;

@@ -3,6 +3,7 @@ const express     = require('express');
 const cors        = require('cors');
 const { connectDB }  = require('./db');
 const requireAuth    = require('./middleware/auth');
+const subCheck       = require('./middleware/subscriptionCheck');
 
 const app = express();
 
@@ -36,19 +37,19 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 // ── Admin routes ──────────────────────────────────────────────────────────────
 app.use('/api/admin', adminGuard, require('./routes/admin'));
 
-// ── Protected routes (JWT required) ──────────────────────────────────────────
-app.use('/api/orders',            requireAuth, require('./routes/orders'));
-app.use('/api/kaligadhs',         requireAuth, require('./routes/kaligadhs'));
-app.use('/api/assignments',       requireAuth, require('./routes/assignments'));
-app.use('/api/dealers',           requireAuth, require('./routes/dealers'));
-app.use('/api/dealer-payments',   requireAuth, require('./routes/dealerPayments'));
-app.use('/api/kaligadh-payments', requireAuth, require('./routes/kaligadhPayments'));
-app.use('/api/salary-records',    requireAuth, require('./routes/salaryRecords'));
-app.use('/api/salary-payments',   requireAuth, require('./routes/salaryPayments'));
-app.use('/api/expenses',          requireAuth, require('./routes/expenses'));
+// ── Protected routes (JWT + subscription check) ───────────────────────────────
+app.use('/api/orders',            requireAuth, subCheck, require('./routes/orders'));
+app.use('/api/kaligadhs',         requireAuth, subCheck, require('./routes/kaligadhs'));
+app.use('/api/assignments',       requireAuth, subCheck, require('./routes/assignments'));
+app.use('/api/dealers',           requireAuth, subCheck, require('./routes/dealers'));
+app.use('/api/dealer-payments',   requireAuth, subCheck, require('./routes/dealerPayments'));
+app.use('/api/kaligadh-payments', requireAuth, subCheck, require('./routes/kaligadhPayments'));
+app.use('/api/salary-records',    requireAuth, subCheck, require('./routes/salaryRecords'));
+app.use('/api/salary-payments',   requireAuth, subCheck, require('./routes/salaryPayments'));
+app.use('/api/expenses',          requireAuth, subCheck, require('./routes/expenses'));
 app.use('/api/activity',          requireAuth, require('./routes/activity'));
-app.use('/api/settings',          requireAuth, require('./routes/settings'));
-app.use('/api/upload',            requireAuth, require('./routes/upload'));
+app.use('/api/settings',          requireAuth, subCheck, require('./routes/settings'));
+app.use('/api/upload',            requireAuth, subCheck, require('./routes/upload'));
 app.use('/api/notifications',     requireAuth, require('./routes/notifications'));
 
 const PORT = process.env.PORT || 5000;

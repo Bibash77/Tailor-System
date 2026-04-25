@@ -37,6 +37,9 @@ function guard(req, res, next) {
   }
 }
 
+const TRIAL_DAYS    = 30;
+const DEFAULT_FEE   = 500; // Rs per month
+
 function signToken(user) {
   return jwt.sign(
     { userId: user._id.toString(), email: user.email, shopName: user.shopName },
@@ -45,42 +48,48 @@ function signToken(user) {
   );
 }
 
+function resolveSubStatus(sub = {}) {
+  const now = new Date();
+  let status = sub.status || 'trial';
+  if (status === 'trial'  && sub.trialEndsAt  && now > new Date(sub.trialEndsAt))  status = 'expired';
+  if (status === 'active' && sub.billedUntil  && now > new Date(sub.billedUntil))  status = 'expired';
+  return status;
+}
+
 function publicUser(u) {
-  return { email: u.email, shopName: u.shopName };
+  const sub    = u.subscription || {};
+  const status = resolveSubStatus(sub);
+  return {
+    email:    u.email,
+    shopName: u.shopName,
+    subscription: {
+      status,
+      trialEndsAt: sub.trialEndsAt  || null,
+      billedUntil: sub.billedUntil  || null,
+      monthlyFee:  sub.monthlyFee   ?? DEFAULT_FEE,
+    },
+  };
 }
 
 // ─── GET /api/auth/status ─────────────────────────────────────────────────────
-// Public. Returns whether a user account exists so the frontend shows
-// Login (existing user) or Register (first launch).
-router.get('/status', async (req, res) => {
-  try {
-    const count = await getDB().collection('users').countDocuments();
-    res.json({ hasUser: count > 0 });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
+router.get('/status', (req, res) => res.json({ hasUser: true }));
 
 // ─── POST /api/auth/register ──────────────────────────────────────────────────
-// Public. Only succeeds when no user exists (single-user system).
 router.post('/register', async (req, res) => {
   try {
-    const db    = getDB();
-    const count = await db.collection('users').countDocuments();
-    if (count > 0) {
-      return res.status(400).json({ error: 'An account already exists. Only one account is allowed.' });
-    }
-
+    const db = getDB();
     const { email, shopName, password } = req.body;
-    if (!email || !shopName || !password) {
+    if (!email || !shopName || !password)
       return res.status(400).json({ error: 'Email, shop name, and password are all required.' });
-    }
-    if (password.length < 6) {
+    if (password.length < 6)
       return res.status(400).json({ error: 'Password must be at least 6 characters.' });
-    }
+
+    const existing = await db.collection('users').findOne({ email: email.trim().toLowerCase() });
+    if (existing)
+      return res.status(400).json({ error: 'An account with this email already exists.' });
 
     const passwordHash = await bcrypt.hash(password, 12);
+    const trialEndsAt  = new Date(Date.now() + TRIAL_DAYS * 86_400_000);
     const doc = {
       email:        email.trim().toLowerCase(),
       shopName:     shopName.trim(),
@@ -88,11 +97,17 @@ router.post('/register', async (req, res) => {
       createdAt:    new Date(),
       resetToken:   null,
       resetExpiry:  null,
+      subscription: {
+        status:      'trial',
+        trialEndsAt,
+        billedUntil: null,
+        monthlyFee:  DEFAULT_FEE,
+        payments:    [],
+      },
     };
 
     const result = await db.collection('users').insertOne(doc);
     doc._id = result.insertedId;
-
     res.status(201).json({ token: signToken(doc), user: publicUser(doc) });
   } catch (err) {
     console.error('Register:', err);
@@ -129,12 +144,16 @@ router.post('/login', async (req, res) => {
 });
 
 // ─── GET /api/auth/me ─────────────────────────────────────────────────────────
-// Protected. Verifies token and returns fresh user data.
 router.get('/me', guard, async (req, res) => {
   try {
     const user = await getDB().collection('users').findOne({ email: req.user.email });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ user: publicUser(user) });
+    // Auto-persist expired status so DB stays in sync
+    const pub = publicUser(user);
+    if (pub.subscription.status === 'expired' && user.subscription?.status !== 'expired') {
+      await getDB().collection('users').updateOne({ email: req.user.email }, { $set: { 'subscription.status': 'expired' } });
+    }
+    res.json({ user: pub });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }

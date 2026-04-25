@@ -52,6 +52,16 @@ export function AuthProvider({ children }) {
     setUser(userData);
   }
 
+  // Call after any action that might change subscription status
+  async function refreshSubscription() {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+    try {
+      const r = await fetch(API_BASE + '/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
+      if (r.ok) { const d = await r.json(); if (d?.user) setUser(d.user); }
+    } catch {}
+  }
+
   function logout() {
     localStorage.removeItem('auth_token');
     setUser(null);
@@ -67,7 +77,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateUser, refreshSession }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateUser, refreshSession, refreshSubscription }}>
       {children}
     </AuthContext.Provider>
   );
