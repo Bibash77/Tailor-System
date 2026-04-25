@@ -8,9 +8,9 @@ import {
 import { API_BASE } from '../../context/AuthContext';
 
 // ─── API helper ───────────────────────────────────────────────────────────────
-function adminFetch(path, opts = {}) {
+async function adminFetch(path, opts = {}) {
   const token = localStorage.getItem('admin_token');
-  return fetch(`${API_BASE}${path}`, {
+  const r = await fetch(`${API_BASE}${path}`, {
     ...opts,
     headers: {
       'Content-Type': 'application/json',
@@ -18,12 +18,43 @@ function adminFetch(path, opts = {}) {
       ...(opts.headers || {}),
     },
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-  }).then(async r => {
-    const data = await r.json();
-    if (r.status === 401) { localStorage.removeItem('admin_token'); window.location.reload(); }
-    if (!r.ok) throw new Error(data.error || 'Request failed');
-    return data;
   });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401) { localStorage.removeItem('admin_token'); window.location.reload(); }
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+let _addToast = null;
+function useToastProvider() {
+  const [toasts, setToasts] = useState([]);
+  _addToast = useCallback((msg, type = 'success') => {
+    const id = Date.now();
+    setToasts(t => [...t, { id, msg, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3500);
+  }, []);
+  return toasts;
+}
+function toast(msg, type) { _addToast?.(msg, type); }
+
+function ToastStack({ toasts }) {
+  return (
+    <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {toasts.map(t => (
+        <div key={t.id} style={{
+          background: t.type === 'error' ? '#DC2626' : '#1C1917',
+          color: 'white', padding: '11px 18px', borderRadius: 10, fontSize: 13,
+          fontWeight: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+          animation: 'slideIn 0.2s ease',
+          maxWidth: 320,
+        }}>
+          {t.msg}
+        </div>
+      ))}
+      <style>{`@keyframes slideIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }`}</style>
+    </div>
+  );
 }
 
 // ─── Shared UI ────────────────────────────────────────────────────────────────
@@ -348,29 +379,28 @@ function UsersTab({ users, shops, onRefresh }) {
 
   async function handleEdit(id, form) {
     await adminFetch(`/api/admin/users/${id}`, { method: 'PATCH', body: form });
-    onRefresh();
+    toast('User updated'); onRefresh();
   }
   async function handleToggle(u) {
     const status = u.status === 'active' ? 'suspended' : 'active';
     await adminFetch(`/api/admin/users/${u._id}`, { method: 'PATCH', body: { status } });
-    onRefresh();
+    toast(status === 'suspended' ? 'User suspended' : 'User activated'); onRefresh();
   }
   async function handleResetQuota(u) {
     await adminFetch(`/api/admin/users/${u._id}/reset-quota`, { method: 'POST' });
-    onRefresh();
+    toast('Scan quota reset'); onRefresh();
   }
   async function handleGrant(id, scans) {
     await adminFetch(`/api/admin/users/${id}/grant-scans`, { method: 'POST', body: { scans } });
-    onRefresh();
+    toast(`Granted ${scans} extra scans`); onRefresh();
   }
   async function handlePayment(id, body) {
     await adminFetch(`/api/admin/users/${id}/subscription/payment`, { method: 'POST', body });
-    onRefresh();
+    toast('Payment recorded — subscription extended'); onRefresh();
   }
   async function handleDelete(u) {
     await adminFetch(`/api/admin/users/${u._id}`, { method: 'DELETE' });
-    setConfirmDel(null);
-    onRefresh();
+    toast('User deleted', 'error'); setConfirmDel(null); onRefresh();
   }
 
   const TH = ({ children }) => (
@@ -686,14 +716,17 @@ function SettingsTab({ onRefresh }) {
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function AdminDashboard({ onLogout }) {
-  const [stats,   setStats]   = useState(null);
-  const [users,   setUsers]   = useState([]);
-  const [shops,   setShops]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [tab,     setTab]     = useState('dashboard');
+  const [stats,    setStats]    = useState(null);
+  const [users,    setUsers]    = useState([]);
+  const [shops,    setShops]    = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [loadErr,  setLoadErr]  = useState('');
+  const [tab,      setTab]      = useState('dashboard');
+  const toasts = useToastProvider();
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadErr('');
     try {
       const [s, u, sh] = await Promise.all([
         adminFetch('/api/admin/stats'),
@@ -703,7 +736,10 @@ export default function AdminDashboard({ onLogout }) {
       setStats(s);
       setUsers(u.users || []);
       setShops(sh.shops || []);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error('Admin load error:', e);
+      setLoadErr(e.message || 'Failed to load data. Check server connection.');
+    }
     finally { setLoading(false); }
   }, []);
 
@@ -716,6 +752,11 @@ export default function AdminDashboard({ onLogout }) {
     { id: 'settings',  label: 'Settings',   icon: Settings },
   ];
 
+  const refreshWithToast = useCallback(async () => {
+    await load();
+    toast('Refreshed');
+  }, [load]);
+
   return (
     <div style={{ minHeight: '100vh', background: '#FAFAF9' }}>
       {/* Header */}
@@ -725,8 +766,9 @@ export default function AdminDashboard({ onLogout }) {
           <span style={{ fontSize: 10, background: 'rgba(255,255,255,0.15)', padding: '2px 8px', borderRadius: 10, fontWeight: 700, letterSpacing: '0.05em' }}>ADMIN</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={load} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
-            <RefreshCw size={13} /> Refresh
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{users.length} users · {shops.length} shops</span>
+          <button onClick={refreshWithToast} disabled={loading} style={{ background: 'none', border: 'none', cursor: 'pointer', color: loading ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
+            <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
           </button>
           <button onClick={onLogout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
             <LogOut size={13} /> Sign Out
@@ -739,9 +781,21 @@ export default function AdminDashboard({ onLogout }) {
         {TABS.map(t => <Tab key={t.id} {...t} active={tab === t.id} onClick={setTab} />)}
       </div>
 
+      {/* Load error banner */}
+      {loadErr && (
+        <div style={{ background: '#FEF2F2', borderBottom: '1px solid #FECACA', padding: '12px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 13, color: '#DC2626' }}>⚠ {loadErr}</span>
+          <button onClick={load} style={{ fontSize: 12, fontWeight: 700, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer' }}>Retry</button>
+        </div>
+      )}
+
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 24px' }}>
-        {loading && tab === 'dashboard' ? (
-          <div style={{ textAlign: 'center', padding: 80, color: '#78716C' }}>Loading…</div>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 80 }}>
+            <div style={{ width: 36, height: 36, border: '3px solid #E7E5E4', borderTopColor: '#1C1917', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 12px' }} />
+            <div style={{ fontSize: 13, color: '#78716C' }}>Loading admin data…</div>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
         ) : (
           <>
             {tab === 'dashboard' && <DashboardTab stats={stats} users={users} onRefresh={load} />}
@@ -751,6 +805,8 @@ export default function AdminDashboard({ onLogout }) {
           </>
         )}
       </div>
+
+      <ToastStack toasts={toasts} />
     </div>
   );
 }

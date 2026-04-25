@@ -1,6 +1,11 @@
 const router       = require('express').Router();
 const { getDB }    = require('../db');
+const { ObjectId } = require('mongodb');
 const crypto       = require('crypto');
+
+function uid(id) {
+  try { return new ObjectId(id); } catch { return id; }
+}
 
 const MONTH = () => new Date().toISOString().slice(0, 7);
 
@@ -132,7 +137,7 @@ router.patch('/users/:id', async (req, res) => {
     if (paidPlanLimit != null) $set['scanQuota.paidPlanLimit'] = Math.max(0, Number(paidPlanLimit));
     if (monthlyCharge != null) $set['scanQuota.monthlyCharge'] = Math.max(0, Number(monthlyCharge));
     if (billingStatus != null) $set['scanQuota.billingStatus'] = billingStatus;
-    await getDB().collection('users').updateOne({ _id: req.params.id }, { $set });
+    await getDB().collection('users').updateOne({ _id: uid(req.params.id) }, { $set });
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -141,7 +146,7 @@ router.patch('/users/:id', async (req, res) => {
 router.post('/users/:id/reset-quota', async (req, res) => {
   try {
     await getDB().collection('users').updateOne(
-      { _id: req.params.id },
+      { _id: uid(req.params.id) },
       { $set: { 'scanQuota.used': 0, 'scanQuota.month': MONTH() } },
     );
     res.json({ ok: true });
@@ -153,7 +158,7 @@ router.post('/users/:id/grant-scans', async (req, res) => {
   try {
     const extra = Math.max(1, Number(req.body.scans) || 0);
     await getDB().collection('users').updateOne(
-      { _id: req.params.id },
+      { _id: uid(req.params.id) },
       { $inc: { 'scanQuota.paidPlanLimit': extra } },
     );
     res.json({ ok: true });
@@ -163,7 +168,7 @@ router.post('/users/:id/grant-scans', async (req, res) => {
 // ─── DELETE /api/admin/users/:id ─────────────────────────────────────────────
 router.delete('/users/:id', async (req, res) => {
   try {
-    await getDB().collection('users').deleteOne({ _id: req.params.id });
+    await getDB().collection('users').deleteOne({ _id: uid(req.params.id) });
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -239,7 +244,7 @@ router.patch('/users/:id/subscription', async (req, res) => {
     const $set = {};
     if (monthlyFee != null) $set['subscription.monthlyFee'] = Math.max(0, Number(monthlyFee));
     if (status)             $set['subscription.status']     = status;
-    await getDB().collection('users').updateOne({ _id: req.params.id }, { $set });
+    await getDB().collection('users').updateOne({ _id: uid(req.params.id) }, { $set });
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -248,7 +253,7 @@ router.post('/users/:id/subscription/payment', async (req, res) => {
   try {
     const { amount, method = 'cash', note = '' } = req.body;
     const db   = getDB();
-    const user = await db.collection('users').findOne({ _id: req.params.id });
+    const user = await db.collection('users').findOne({ _id: uid(req.params.id) });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const sub  = user.subscription || {};
@@ -259,7 +264,7 @@ router.post('/users/:id/subscription/payment', async (req, res) => {
 
     const payment = { amount: Number(amount) || sub.monthlyFee || 500, method, note, paidAt: now };
     await db.collection('users').updateOne(
-      { _id: req.params.id },
+      { _id: uid(req.params.id) },
       { $set: { 'subscription.status': 'active', 'subscription.billedUntil': billedUntil }, $push: { 'subscription.payments': payment } },
     );
     res.json({ ok: true, billedUntil });
