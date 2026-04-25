@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera, ImagePlus, Check, X, Loader, AlertCircle, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import { scanQueueDB } from '../db';
 import { authFetch } from '../context/AuthContext';
+import { ConfirmModal as DiscardDialog } from '../components/UI';
 
 // ─── Thumbnail helper (client-side resize before upload) ──────────────────────
 function resizeImage(file, maxPx = 1600, thumbPx = 220) {
@@ -262,6 +263,7 @@ export default function ScanOrders({ itemCategories = [] }) {
   const [queue,          setQueue]          = useState([]);
   const [quota,          setQuota]          = useState(null);
   const [confirmingItem, setConfirmingItem] = useState(null);
+  const [discardingId,   setDiscardingId]   = useState(null);
   const cameraRef  = useRef();
   const galleryRef = useRef();
 
@@ -313,7 +315,12 @@ export default function ScanOrders({ itemCategories = [] }) {
   }
 
   async function handleDiscard(id) {
-    if (!window.confirm('Discard this scanned bill?')) return;
+    setDiscardingId(id);
+  }
+
+  async function confirmDiscard() {
+    const id = discardingId;
+    setDiscardingId(null);
     await scanQueueDB.discard(id).catch(() => {});
     setQueue(q => q.filter(i => i._id !== id && String(i._id) !== String(id)));
   }
@@ -410,13 +417,25 @@ export default function ScanOrders({ itemCategories = [] }) {
 
       </div>
 
-      {/* Confirm modal */}
+      {/* Confirm order modal */}
       {confirmingItem && (
         <ConfirmModal
           item={confirmingItem}
           itemCategories={itemCategories}
           onConfirm={handleConfirm}
           onClose={() => setConfirmingItem(null)}
+        />
+      )}
+
+      {/* Discard confirmation dialog */}
+      {discardingId && (
+        <DiscardDialog
+          title="Discard Bill?"
+          message="This scanned bill will be permanently deleted. This action cannot be undone."
+          confirmLabel="Discard"
+          danger
+          onConfirm={confirmDiscard}
+          onCancel={() => setDiscardingId(null)}
         />
       )}
     </div>

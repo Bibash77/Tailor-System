@@ -32,6 +32,7 @@ app.use(async (req, res, next) => {
       const db = await connectDB();
       isConnected = true;
       require('../server/services/scanTracker').init(db);
+      await seedAdmin(db);
     } catch (err) {
       return res.status(500).json({ error: 'Database connection failed' });
     }
@@ -39,7 +40,12 @@ app.use(async (req, res, next) => {
   next();
 });
 
+const adminGuard = require('../server/middleware/adminAuth');
+const { router: adminAuthRouter, seedAdmin } = require('../server/routes/adminAuth');
+
 app.use('/api/auth',              require('../server/routes/auth'));
+app.use('/api/admin/auth',        adminAuthRouter);
+app.use('/api/admin',             adminGuard, require('../server/routes/admin'));
 app.use('/api/scan',              requireAuth, require('../server/routes/scan'));
 app.use('/api/scan-queue',        requireAuth, require('../server/routes/scanQueue'));
 app.use('/api/orders',            requireAuth, require('../server/routes/orders'));

@@ -16,6 +16,9 @@ import ResetPassword  from './pages/auth/ResetPassword';
 import NotificationBell from './components/NotificationBell';
 import { setupPushNotifications, onForegroundMessage } from './firebase';
 
+import AdminLogin     from './pages/admin/AdminLogin';
+import AdminDashboard from './pages/admin/AdminDashboard';
+
 import Dashboard      from './pages/Dashboard';
 import Orders         from './pages/Orders';
 import NewOrder       from './pages/NewOrder';
@@ -207,6 +210,20 @@ function AppShell() {
   );
 }
 
+// ─── Admin shell ──────────────────────────────────────────────────────────────
+
+function AdminShell() {
+  const [token, setToken] = useState(() => localStorage.getItem('admin_token'));
+
+  function handleLogout() {
+    localStorage.removeItem('admin_token');
+    setToken(null);
+  }
+
+  if (!token) return <AdminLogin onLogin={setToken} />;
+  return <AdminDashboard onLogout={handleLogout} />;
+}
+
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 function AppContent() {
@@ -218,6 +235,18 @@ function AppContent() {
     if (t) window.history.replaceState({}, '', window.location.pathname);
     return t || null;
   });
+
+  // Admin panel: accessed via ?admin=1 in URL or existing admin_token
+  const [isAdminMode] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('admin') === '1') {
+      window.history.replaceState({}, '', window.location.pathname);
+      return true;
+    }
+    return !!localStorage.getItem('admin_token');
+  });
+
+  if (isAdminMode) return <AdminShell />;
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#FAFAF9' }}>
