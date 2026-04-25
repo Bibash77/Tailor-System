@@ -88,6 +88,21 @@ router.post('/register', async (req, res) => {
     if (existing)
       return res.status(400).json({ error: 'An account with this email already exists.' });
 
+    // Get admin defaults for quota
+    let defaults = { freeScanLimit: 20, monthlyCharge: 500 };
+    try {
+      const d = await db.collection('settings').findOne({ _id: 'adminDefaults' });
+      if (d) defaults = { ...defaults, ...d };
+    } catch {}
+
+    // Create shop
+    const shopId = crypto.randomUUID();
+    await db.collection('shops').insertOne({
+      _id:       shopId,
+      name:      shopName.trim(),
+      createdAt: new Date(),
+    });
+
     const passwordHash = await bcrypt.hash(password, 12);
     const trialEndsAt  = new Date(Date.now() + TRIAL_DAYS * 86_400_000);
     const doc = {
@@ -97,11 +112,23 @@ router.post('/register', async (req, res) => {
       createdAt:    new Date(),
       resetToken:   null,
       resetExpiry:  null,
+      shopId,
+      role:         'shop_admin',
+      status:       'active',
+      scanQuota: {
+        freeScanLimit:  defaults.freeScanLimit,
+        used:           0,
+        paidPlanLimit:  0,
+        monthlyCharge:  defaults.monthlyCharge,
+        billingStatus:  'active',
+        renewDate:      null,
+        month:          '',
+      },
       subscription: {
         status:      'trial',
         trialEndsAt,
         billedUntil: null,
-        monthlyFee:  DEFAULT_FEE,
+        monthlyFee:  defaults.monthlyCharge,
         payments:    [],
       },
     };

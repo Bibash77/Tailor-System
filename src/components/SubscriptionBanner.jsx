@@ -5,7 +5,18 @@ function daysLeft(dateStr) {
   return Math.max(0, Math.ceil((new Date(dateStr) - Date.now()) / 86_400_000));
 }
 
-export default function SubscriptionBanner({ subscription }) {
+export default function SubscriptionBanner({ subscription, accountStatus }) {
+  if (accountStatus === 'suspended') {
+    return (
+      <div style={{ background: '#FEF2F2', borderBottom: '1px solid #FECACA', padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <XCircle size={16} style={{ color: '#DC2626', flexShrink: 0 }} />
+        <div style={{ flex: 1, fontSize: 13 }}>
+          <strong style={{ color: '#DC2626' }}>Account suspended.</strong>
+          <span style={{ color: '#78716C', marginLeft: 6 }}>Contact the admin to restore access.</span>
+        </div>
+      </div>
+    );
+  }
   if (!subscription) return null;
   const { status, trialEndsAt, billedUntil } = subscription;
 

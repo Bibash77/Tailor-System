@@ -4,9 +4,9 @@ const { ObjectId } = require('mongodb');
 const tracker  = require('../services/scanTracker');
 const crypto   = require('crypto');
 
-const OPENROUTER_URL        = 'https://openrouter.ai/api/v1/chat/completions';
-const DEFAULT_MONTHLY_LIMIT = 100;
-const DEFAULT_PRICE         = 100; // Rs per month
+const OPENROUTER_URL       = 'https://openrouter.ai/api/v1/chat/completions';
+const DEFAULT_FREE_LIMIT   = 20;
+const DEFAULT_CHARGE       = 500;
 const MODELS = [
   'google/gemini-2.0-flash-001',
   'google/gemini-2.5-flash-preview',
@@ -20,22 +20,42 @@ async function getUserQuota(db, email) {
   const month = new Date().toISOString().slice(0, 7);
   const user  = await db.collection('users').findOne({ email });
   if (!user) throw new Error('User not found');
+  if (user.status === 'suspended') throw new Error('Account suspended. Contact admin.');
 
   const q = user.scanQuota || {};
+
+  // Auto-reset on new month
   if (q.month !== month) {
-    // New month — reset
-    const fresh = {
-      monthlyLimit: q.monthlyLimit || DEFAULT_MONTHLY_LIMIT,
-      price:        q.price        || DEFAULT_PRICE,
-      used:  0,
+    const reset = {
+      freeScanLimit:  q.freeScanLimit  ?? DEFAULT_FREE_LIMIT,
+      used:           0,
+      paidPlanLimit:  q.paidPlanLimit  ?? 0,
+      monthlyCharge:  q.monthlyCharge  ?? DEFAULT_CHARGE,
+      billingStatus:  q.billingStatus  ?? 'active',
+      renewDate:      q.renewDate      ?? null,
       month,
     };
-    await db.collection('users').updateOne({ email }, { $set: { scanQuota: fresh } });
-    return { ...fresh, remaining: fresh.monthlyLimit };
+    await db.collection('users').updateOne({ email }, { $set: { scanQuota: reset } });
+    return buildQuotaResponse(reset);
   }
-  const used      = q.used || 0;
-  const limit     = q.monthlyLimit || DEFAULT_MONTHLY_LIMIT;
-  return { monthlyLimit: limit, price: q.price || DEFAULT_PRICE, used, month, remaining: Math.max(0, limit - used) };
+  return buildQuotaResponse(q);
+}
+
+function buildQuotaResponse(q) {
+  const freeLimit = q.freeScanLimit ?? DEFAULT_FREE_LIMIT;
+  const paidLimit = q.paidPlanLimit ?? 0;
+  const used      = q.used          ?? 0;
+  const total     = freeLimit + paidLimit;
+  return {
+    freeScanLimit:  freeLimit,
+    paidPlanLimit:  paidLimit,
+    monthlyLimit:   total,
+    used,
+    remaining:      Math.max(0, total - used),
+    monthlyCharge:  q.monthlyCharge ?? DEFAULT_CHARGE,
+    billingStatus:  q.billingStatus ?? 'active',
+    month:          q.month,
+  };
 }
 
 // Charge is on API hit — called immediately before AI processing
@@ -43,10 +63,7 @@ async function chargeOneScan(db, email) {
   const month = new Date().toISOString().slice(0, 7);
   await db.collection('users').updateOne(
     { email },
-    {
-      $inc: { 'scanQuota.used': 1 },
-      $set: { 'scanQuota.month': month },
-    },
+    { $inc: { 'scanQuota.used': 1 }, $set: { 'scanQuota.month': month } },
   );
 }
 
@@ -148,7 +165,7 @@ router.post('/', async (req, res) => {
 
     // Check quota first
     const quota = await getUserQuota(db, email);
-    if (quota.used >= quota.monthlyLimit) {
+    if (quota.remaining <= 0) {
       return res.status(402).json({
         error: `Monthly scan limit of ${quota.monthlyLimit} reached. Resets next month.`,
         quotaExceeded: true,

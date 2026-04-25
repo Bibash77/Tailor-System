@@ -189,7 +189,7 @@ function AppShell() {
       </aside>
 
       <main className="main-content" style={{ display: 'flex', flexDirection: 'column' }}>
-        <SubscriptionBanner subscription={user?.subscription} />
+        <SubscriptionBanner subscription={user?.subscription} accountStatus={user?.status} />
         <div style={{ flex: 1, overflow: 'auto' }}>{content}</div>
       </main>
     </div>

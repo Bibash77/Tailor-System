@@ -2,22 +2,30 @@ const { getDB } = require('../db');
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-function resolveStatus(sub = {}) {
+function resolveSubStatus(sub = {}) {
   const now = new Date();
-  let status = sub.status || 'trial';
-  if (status === 'trial'  && sub.trialEndsAt && now > new Date(sub.trialEndsAt))  status = 'expired';
-  if (status === 'active' && sub.billedUntil && now > new Date(sub.billedUntil))  status = 'expired';
-  return status;
+  let s = sub.status || 'trial';
+  if (s === 'trial'  && sub.trialEndsAt && now > new Date(sub.trialEndsAt))  s = 'expired';
+  if (s === 'active' && sub.billedUntil && now > new Date(sub.billedUntil))  s = 'expired';
+  return s;
 }
 
 module.exports = async function subscriptionCheck(req, res, next) {
   if (SAFE_METHODS.has(req.method)) return next();
   try {
-    const user   = await getDB().collection('users').findOne({ email: req.user.email }, { projection: { subscription: 1 } });
-    const status = resolveStatus(user?.subscription);
-    if (status === 'expired') {
+    const user = await getDB().collection('users').findOne(
+      { email: req.user.email },
+      { projection: { status: 1, subscription: 1 } },
+    );
+
+    if (user?.status === 'suspended') {
+      return res.status(403).json({ error: 'Account suspended. Contact admin.', suspended: true });
+    }
+
+    const subStatus = resolveSubStatus(user?.subscription);
+    if (subStatus === 'expired') {
       return res.status(402).json({
-        error: 'Your subscription has expired. Please contact the admin to renew.',
+        error: 'Your subscription has expired. Contact admin to renew.',
         subscriptionExpired: true,
       });
     }
