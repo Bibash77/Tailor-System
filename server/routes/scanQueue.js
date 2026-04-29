@@ -14,28 +14,31 @@ const MODELS = [
   'google/gemini-flash-1.5',
 ];
 
-// ─── Per-user quota (stored in users collection) ──────────────────────────────
+// ─── Per-shop quota (stored in shops collection, shared by all shop users) ────
 
-async function getUserQuota(db, email) {
+async function getShopQuota(db, email) {
   const month = new Date().toISOString().slice(0, 7);
-  const user  = await db.collection('users').findOne({ email });
+  const user  = await db.collection('users').findOne({ email }, { projection: { status: 1, shopId: 1 } });
   if (!user) throw new Error('User not found');
   if (user.status === 'suspended') throw new Error('Account suspended. Contact admin.');
 
-  const q = user.scanQuota || {};
+  const shop = user.shopId ? await db.collection('shops').findOne({ _id: user.shopId }) : null;
+  if (!shop) throw new Error('Shop not found');
+
+  const q = shop.scanQuota || {};
 
   // Auto-reset on new month
   if (q.month !== month) {
     const reset = {
-      freeScanLimit:  q.freeScanLimit  ?? DEFAULT_FREE_LIMIT,
-      used:           0,
-      paidPlanLimit:  q.paidPlanLimit  ?? 0,
-      monthlyCharge:  q.monthlyCharge  ?? DEFAULT_CHARGE,
-      billingStatus:  q.billingStatus  ?? 'active',
-      renewDate:      q.renewDate      ?? null,
+      freeScanLimit: q.freeScanLimit ?? DEFAULT_FREE_LIMIT,
+      used:          0,
+      paidPlanLimit: q.paidPlanLimit ?? 0,
+      monthlyCharge: q.monthlyCharge ?? DEFAULT_CHARGE,
+      billingStatus: q.billingStatus ?? 'active',
+      renewDate:     q.renewDate     ?? null,
       month,
     };
-    await db.collection('users').updateOne({ email }, { $set: { scanQuota: reset } });
+    await db.collection('shops').updateOne({ _id: shop._id }, { $set: { scanQuota: reset } });
     return buildQuotaResponse(reset);
   }
   return buildQuotaResponse(q);
@@ -58,13 +61,15 @@ function buildQuotaResponse(q) {
   };
 }
 
-// Charge is on API hit — called immediately before AI processing
 async function chargeOneScan(db, email) {
   const month = new Date().toISOString().slice(0, 7);
-  await db.collection('users').updateOne(
-    { email },
-    { $inc: { 'scanQuota.used': 1 }, $set: { 'scanQuota.month': month } },
-  );
+  const user  = await db.collection('users').findOne({ email }, { projection: { shopId: 1 } });
+  if (user?.shopId) {
+    await db.collection('shops').updateOne(
+      { _id: user.shopId },
+      { $inc: { 'scanQuota.used': 1 }, $set: { 'scanQuota.month': month } },
+    );
+  }
 }
 
 // ─── AI processing ────────────────────────────────────────────────────────────
@@ -137,7 +142,7 @@ async function runAI(imageDataUrl, cats) {
 // GET /api/scan-queue/quota
 router.get('/quota', async (req, res) => {
   try {
-    const q = await getUserQuota(getDB(), req.user.email);
+    const q = await getShopQuota(getDB(), req.user.email);
     res.json(q);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -163,8 +168,8 @@ router.post('/', async (req, res) => {
     const { image, thumb, itemCategories = [] } = req.body;
     if (!image) return res.status(400).json({ error: 'Image required' });
 
-    // Check quota first
-    const quota = await getUserQuota(db, email);
+    // Check shop quota first
+    const quota = await getShopQuota(db, email);
     if (quota.remaining <= 0) {
       return res.status(402).json({
         error: `Monthly scan limit of ${quota.monthlyLimit} reached. Resets next month.`,

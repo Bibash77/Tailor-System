@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   LogOut, Users, ScanLine, TrendingUp, RefreshCw, ChevronDown, ChevronUp,
   Search, Edit2, Check, X, Trash2, ShieldCheck, ShieldOff, RotateCcw,
@@ -46,8 +46,7 @@ function ToastStack({ toasts }) {
           background: t.type === 'error' ? '#DC2626' : '#1C1917',
           color: 'white', padding: '11px 18px', borderRadius: 10, fontSize: 13,
           fontWeight: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-          animation: 'slideIn 0.2s ease',
-          maxWidth: 320,
+          animation: 'slideIn 0.2s ease', maxWidth: 320,
         }}>
           {t.msg}
         </div>
@@ -71,8 +70,7 @@ function Badge({ color, children }) {
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
       background: c.bg, color: c.text, border: `1px solid ${c.border}`,
-      padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-      whiteSpace: 'nowrap',
+      padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
     }}>
       {children}
     </span>
@@ -109,7 +107,23 @@ function Tab({ id, label, icon: Icon, active, onClick }) {
   );
 }
 
-// ─── User status/role helpers ─────────────────────────────────────────────────
+function ActionBtn({ icon: Icon, title, color, onClick }) {
+  return (
+    <button onClick={onClick} title={title} style={{
+      width: 30, height: 30, borderRadius: 7, border: `1px solid ${color}22`,
+      background: `${color}0d`, color, cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      transition: 'all 0.15s', flexShrink: 0,
+    }}
+      onMouseEnter={e => { e.currentTarget.style.background = `${color}22`; }}
+      onMouseLeave={e => { e.currentTarget.style.background = `${color}0d`; }}
+    >
+      <Icon size={13} />
+    </button>
+  );
+}
+
+// ─── Status helpers ───────────────────────────────────────────────────────────
 function statusBadge(s) {
   if (s === 'active')    return <Badge color="green"><CheckCircle size={10} /> Active</Badge>;
   if (s === 'suspended') return <Badge color="red"><XCircle size={10} /> Suspended</Badge>;
@@ -126,16 +140,12 @@ function subBadge(s) {
   return <Badge color="gray">{s}</Badge>;
 }
 
-// ─── Edit User Modal ──────────────────────────────────────────────────────────
+// ─── Edit User Modal (role + status + shop reassignment only) ─────────────────
 function EditUserModal({ user, shops, onSave, onClose }) {
   const [form, setForm] = useState({
-    role:           user.role           || 'shop_admin',
-    status:         user.status         || 'active',
-    freeScanLimit:  user.scanQuota?.freeScanLimit ?? 20,
-    paidPlanLimit:  user.scanQuota?.paidPlanLimit ?? 0,
-    monthlyCharge:  user.scanQuota?.monthlyCharge ?? 500,
-    billingStatus:  user.scanQuota?.billingStatus ?? 'active',
-    shopId:         user.shopId || '',
+    role:   user.role   || 'shop_admin',
+    status: user.status || 'active',
+    shopId: user.shopId || '',
   });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -147,25 +157,20 @@ function EditUserModal({ user, shops, onSave, onClose }) {
     finally { setSaving(false); }
   }
 
-  const fld = (label, key, type = 'text', options) => (
+  const sel = (label, key, options) => (
     <div>
       <label style={{ fontSize: 11, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>{label}</label>
-      {options ? (
-        <select value={form[key]} onChange={e => set(key, e.target.value)}
-          style={{ width: '100%', padding: '8px 10px', borderRadius: 7, border: '1.5px solid #E7E5E4', fontSize: 13, background: 'white' }}>
-          {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-      ) : (
-        <input type={type} value={form[key]} onChange={e => set(key, e.target.value)}
-          style={{ width: '100%', padding: '8px 10px', borderRadius: 7, border: '1.5px solid #E7E5E4', fontSize: 13, boxSizing: 'border-box' }} />
-      )}
+      <select value={form[key]} onChange={e => set(key, e.target.value)}
+        style={{ width: '100%', padding: '8px 10px', borderRadius: 7, border: '1.5px solid #E7E5E4', fontSize: 13, background: 'white' }}>
+        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
     </div>
   );
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 460, padding: '28px 24px', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 400, padding: '28px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div>
             <div style={{ fontFamily: 'DM Serif Display', fontSize: 20 }}>Edit User</div>
@@ -176,34 +181,19 @@ function EditUserModal({ user, shops, onSave, onClose }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {fld('Role', 'role', 'text', [['shop_admin', 'Shop Admin'], ['associate', 'Associate']])}
-            {fld('Account Status', 'status', 'text', [['active', 'Active'], ['suspended', 'Suspended']])}
-          </div>
-
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 4, borderTop: '1px solid #F5F5F4', paddingTop: 12 }}>
-            Scan Quota
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {fld('Free Scans / Month', 'freeScanLimit', 'number')}
-            {fld('Paid Extra Scans', 'paidPlanLimit', 'number')}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {fld('Monthly Charge (Rs)', 'monthlyCharge', 'number')}
-            {fld('Billing Status', 'billingStatus', 'text', [
-              ['active', 'Active'], ['unpaid', 'Unpaid'], ['grace', 'Grace Period'], ['suspended', 'Suspended'],
-            ])}
-          </div>
-
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 4, borderTop: '1px solid #F5F5F4', paddingTop: 12 }}>
-            Shop Assignment
+            {sel('Role', 'role', [['shop_admin', 'Shop Admin'], ['associate', 'Associate']])}
+            {sel('Account Status', 'status', [['active', 'Active'], ['suspended', 'Suspended']])}
           </div>
           <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>Shop</label>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>Shop Assignment</label>
             <select value={form.shopId} onChange={e => set('shopId', e.target.value)}
               style={{ width: '100%', padding: '8px 10px', borderRadius: 7, border: '1.5px solid #E7E5E4', fontSize: 13, background: 'white' }}>
               <option value="">— None —</option>
               {shops.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
             </select>
+          </div>
+          <div style={{ fontSize: 11, color: '#78716C', background: '#F5F5F4', borderRadius: 7, padding: '8px 10px' }}>
+            Subscription &amp; quota settings are managed at the shop level (Shops tab).
           </div>
         </div>
 
@@ -218,152 +208,12 @@ function EditUserModal({ user, shops, onSave, onClose }) {
   );
 }
 
-// ─── Grant Scans Modal ────────────────────────────────────────────────────────
-function GrantScansModal({ user, onSave, onClose }) {
-  const [scans, setScans] = useState(10);
-  const [saving, setSaving] = useState(false);
-  async function save() {
-    setSaving(true);
-    try { await onSave(user._id, scans); onClose(); }
-    catch (e) { alert(e.message); }
-    finally { setSaving(false); }
-  }
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 340, padding: '28px 24px' }}>
-        <div style={{ fontFamily: 'DM Serif Display', fontSize: 20, marginBottom: 4 }}>Grant Extra Scans</div>
-        <div style={{ fontSize: 12, color: '#78716C', marginBottom: 20 }}>{user.email}</div>
-        <label style={{ fontSize: 11, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>Number of scans to grant</label>
-        <input type="number" value={scans} min={1} onChange={e => setScans(e.target.value)}
-          style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid #E7E5E4', fontSize: 15, boxSizing: 'border-box', marginBottom: 20 }} />
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} className="btn btn-ghost" style={{ flex: 1 }}>Cancel</button>
-          <button onClick={save} disabled={saving} className="btn btn-primary" style={{ flex: 1 }}>{saving ? 'Saving…' : 'Grant'}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Record Payment Modal ─────────────────────────────────────────────────────
-function PaymentModal({ user, onSave, onClose }) {
-  const defaultAmt = user.scanQuota?.monthlyCharge ?? user.subscription?.monthlyFee ?? 500;
-  const [amount, setAmount] = useState(defaultAmt);
-  const [method, setMethod] = useState('cash');
-  const [note,   setNote]   = useState('');
-  const [saving, setSaving] = useState(false);
-  async function save(e) {
-    e.preventDefault();
-    setSaving(true);
-    try { await onSave(user._id, { amount: Number(amount), method, note }); onClose(); }
-    catch (e) { alert(e.message); }
-    finally { setSaving(false); }
-  }
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 380, padding: '28px 24px' }}>
-        <div style={{ fontFamily: 'DM Serif Display', fontSize: 20, marginBottom: 4 }}>Record Payment</div>
-        <div style={{ fontSize: 12, color: '#78716C', marginBottom: 20 }}>{user.email} · {user.shopName}</div>
-        <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {[
-            ['Amount (Rs)', 'number', amount, setAmount],
-          ].map(([lbl, type, val, setter]) => (
-            <div key={lbl}>
-              <label style={{ fontSize: 11, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>{lbl}</label>
-              <input type={type} value={val} onChange={e => setter(e.target.value)} required
-                style={{ width: '100%', padding: '8px 10px', borderRadius: 7, border: '1.5px solid #E7E5E4', fontSize: 13, boxSizing: 'border-box' }} />
-            </div>
-          ))}
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>Method</label>
-            <select value={method} onChange={e => setMethod(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', borderRadius: 7, border: '1.5px solid #E7E5E4', fontSize: 13, background: 'white' }}>
-              {[['cash','Cash'],['esewa','eSewa'],['bank','Bank Transfer'],['other','Other']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>Note (optional)</label>
-            <input value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. April 2026"
-              style={{ width: '100%', padding: '8px 10px', borderRadius: 7, border: '1.5px solid #E7E5E4', fontSize: 13, boxSizing: 'border-box' }} />
-          </div>
-          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-            <button type="button" onClick={onClose} className="btn btn-ghost" style={{ flex: 1 }}>Cancel</button>
-            <button type="submit" disabled={saving} className="btn btn-primary" style={{ flex: 1 }}>{saving ? 'Saving…' : 'Record Payment'}</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// ─── Dashboard Tab ────────────────────────────────────────────────────────────
-function DashboardTab({ stats, users, onRefresh }) {
-  const nearQuotaUsers = users.filter(u => u.scanQuota?.nearQuota && u.status !== 'suspended');
-  const recentUsers    = [...users].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
-
-  return (
-    <div>
-      {/* Stats cards */}
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 28 }}>
-        <StatCard label="Total Users"     value={stats?.totalUsers}      icon={Users}      color="#1C1917" />
-        <StatCard label="Active Users"    value={stats?.activeUsers}     icon={UserCheck}  color="#16A34A" />
-        <StatCard label="Total Shops"     value={stats?.totalShops}      icon={Building2}  color="#2563EB" />
-        <StatCard label="Scans This Month" value={stats?.scansThisMonth} icon={ScanLine}   color="#7C3AED" />
-        <StatCard label="Expected Revenue" value={stats?.expectedRevenue != null ? `Rs ${stats.expectedRevenue.toLocaleString('en-IN')}` : '—'} icon={TrendingUp} color="#16A34A" sub="sum of all monthly charges" />
-        <StatCard label="Suspended"       value={stats?.suspendedUsers}  icon={UserX}      color="#DC2626" />
-        <StatCard label="Near Quota (≤3)" value={stats?.nearQuota}       icon={AlertTriangle} color="#D97706" />
-        <StatCard label="Expired Sub"     value={stats?.expiredSub}      icon={XCircle}    color="#DC2626" />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        {/* Near quota users */}
-        <div style={{ background: 'white', borderRadius: 12, border: '1.5px solid #E7E5E4', overflow: 'hidden' }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid #F5F5F4', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 7 }}>
-            <AlertTriangle size={14} style={{ color: '#D97706' }} /> Near Quota Limit
-          </div>
-          {nearQuotaUsers.length === 0 ? (
-            <div style={{ padding: '24px 18px', color: '#78716C', fontSize: 13, textAlign: 'center' }}>All users have sufficient scans</div>
-          ) : nearQuotaUsers.map(u => (
-            <div key={u._id} style={{ padding: '10px 18px', borderBottom: '1px solid #FAFAF9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{u.shopName || u.email}</div>
-                <div style={{ fontSize: 11, color: '#78716C' }}>{u.email}</div>
-              </div>
-              <Badge color="yellow">{u.scanQuota?.remaining} left</Badge>
-            </div>
-          ))}
-        </div>
-
-        {/* Recent registrations */}
-        <div style={{ background: 'white', borderRadius: 12, border: '1.5px solid #E7E5E4', overflow: 'hidden' }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid #F5F5F4', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 7 }}>
-            <Users size={14} style={{ color: '#2563EB' }} /> Recent Registrations
-          </div>
-          {recentUsers.map(u => (
-            <div key={u._id} style={{ padding: '10px 18px', borderBottom: '1px solid #FAFAF9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{u.shopName || u.email}</div>
-                <div style={{ fontSize: 11, color: '#78716C' }}>{u.email}</div>
-              </div>
-              <div style={{ fontSize: 11, color: '#78716C' }}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN') : '—'}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Users Tab ────────────────────────────────────────────────────────────────
 function UsersTab({ users, shops, onRefresh }) {
-  const [search,      setSearch]      = useState('');
-  const [filter,      setFilter]      = useState('all');
-  const [editUser,    setEditUser]    = useState(null);
-  const [grantUser,   setGrantUser]   = useState(null);
-  const [payUser,     setPayUser]     = useState(null);
-  const [confirmDel,  setConfirmDel]  = useState(null);
+  const [search,     setSearch]     = useState('');
+  const [filter,     setFilter]     = useState('all');
+  const [editUser,   setEditUser]   = useState(null);
+  const [confirmDel, setConfirmDel] = useState(null);
 
   const filtered = users.filter(u => {
     const q = search.toLowerCase();
@@ -386,18 +236,6 @@ function UsersTab({ users, shops, onRefresh }) {
     await adminFetch(`/api/admin/users/${u._id}`, { method: 'PATCH', body: { status } });
     toast(status === 'suspended' ? 'User suspended' : 'User activated'); onRefresh();
   }
-  async function handleResetQuota(u) {
-    await adminFetch(`/api/admin/users/${u._id}/reset-quota`, { method: 'POST' });
-    toast('Scan quota reset'); onRefresh();
-  }
-  async function handleGrant(id, scans) {
-    await adminFetch(`/api/admin/users/${id}/grant-scans`, { method: 'POST', body: { scans } });
-    toast(`Granted ${scans} extra scans`); onRefresh();
-  }
-  async function handlePayment(id, body) {
-    await adminFetch(`/api/admin/users/${id}/subscription/payment`, { method: 'POST', body });
-    toast('Payment recorded — subscription extended'); onRefresh();
-  }
   async function handleDelete(u) {
     await adminFetch(`/api/admin/users/${u._id}`, { method: 'DELETE' });
     toast('User deleted', 'error'); setConfirmDel(null); onRefresh();
@@ -416,15 +254,11 @@ function UsersTab({ users, shops, onRefresh }) {
 
   return (
     <div>
-      {/* Search + filter bar */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
           <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#A8A29E' }} />
-          <input
-            value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search email or shop…"
-            style={{ width: '100%', padding: '8px 12px 8px 34px', borderRadius: 8, border: '1.5px solid #E7E5E4', fontSize: 13, boxSizing: 'border-box' }}
-          />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search email or shop…"
+            style={{ width: '100%', padding: '8px 12px 8px 34px', borderRadius: 8, border: '1.5px solid #E7E5E4', fontSize: 13, boxSizing: 'border-box' }} />
         </div>
         {[['all','All'],['active','Active'],['suspended','Suspended'],['nearquota','Near Quota'],['expired','Expired Sub']].map(([v, l]) => (
           <button key={v} onClick={() => setFilter(v)}
@@ -439,25 +273,25 @@ function UsersTab({ users, shops, onRefresh }) {
       </div>
 
       <div style={{ background: 'white', borderRadius: 12, border: '1.5px solid #E7E5E4', overflow: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
           <thead style={{ background: '#FAFAF9' }}>
             <tr>
               <TH>User / Shop</TH>
               <TH>Role</TH>
               <TH>Status</TH>
-              <TH>Scans Used</TH>
-              <TH>Subscription</TH>
-              <TH>Charge / mo</TH>
+              <TH>Shop Subscription</TH>
+              <TH>Shop Scans</TH>
               <TH>Joined</TH>
               <TH>Actions</TH>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#78716C', fontSize: 13 }}>No users found</td></tr>
+              <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#78716C', fontSize: 13 }}>No users found</td></tr>
             ) : filtered.map(u => {
               const q   = u.scanQuota || {};
-              const pct = Math.min(100, Math.round((q.used / Math.max(1, q.freeScanLimit + (q.paidPlanLimit || 0))) * 100));
+              const total = (q.freeScanLimit || 20) + (q.paidPlanLimit || 0);
+              const pct = Math.min(100, Math.round(((q.used || 0) / Math.max(1, total)) * 100));
               return (
                 <tr key={u._id} style={{ background: u.status === 'suspended' ? '#FFFBEB' : 'white' }}>
                   <TD>
@@ -467,28 +301,24 @@ function UsersTab({ users, shops, onRefresh }) {
                   </TD>
                   <TD>{roleBadge(u.role)}</TD>
                   <TD>{statusBadge(u.status)}</TD>
+                  <TD>{subBadge(u.subscription?.status)}</TD>
                   <TD>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 72, height: 5, background: '#F5F5F4', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: 64, height: 5, background: '#F5F5F4', borderRadius: 3, overflow: 'hidden' }}>
                         <div style={{ height: '100%', width: `${pct}%`, background: pct >= 90 ? '#DC2626' : pct >= 70 ? '#D97706' : '#16A34A', borderRadius: 3 }} />
                       </div>
                       <span style={{ fontSize: 11, color: '#57534E', whiteSpace: 'nowrap' }}>
-                        {q.used || 0}/{(q.freeScanLimit || 20) + (q.paidPlanLimit || 0)}
+                        {q.used || 0}/{total}
                       </span>
                     </div>
                     {q.nearQuota && <div style={{ fontSize: 10, color: '#D97706', marginTop: 2 }}>⚠ {q.remaining} left</div>}
                   </TD>
-                  <TD>{subBadge(u.subscription?.status)}</TD>
-                  <TD style={{ fontSize: 13, fontWeight: 600 }}>Rs {q.monthlyCharge || 500}</TD>
                   <TD style={{ fontSize: 12, color: '#78716C', whiteSpace: 'nowrap' }}>
                     {u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN') : '—'}
                   </TD>
                   <TD>
-                    <div style={{ display: 'flex', gap: 5, flexWrap: 'nowrap' }}>
-                      <ActionBtn icon={Edit2}     title="Edit"          color="#2563EB" onClick={() => setEditUser(u)} />
-                      <ActionBtn icon={CreditCard} title="Record payment" color="#16A34A" onClick={() => setPayUser(u)} />
-                      <ActionBtn icon={Gift}       title="Grant scans"   color="#7C3AED" onClick={() => setGrantUser(u)} />
-                      <ActionBtn icon={RotateCcw}  title="Reset quota"   color="#D97706" onClick={() => handleResetQuota(u)} />
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      <ActionBtn icon={Edit2}    title="Edit user"  color="#2563EB" onClick={() => setEditUser(u)} />
                       <ActionBtn
                         icon={u.status === 'active' ? ShieldOff : ShieldCheck}
                         title={u.status === 'active' ? 'Suspend' : 'Activate'}
@@ -505,15 +335,13 @@ function UsersTab({ users, shops, onRefresh }) {
         </table>
       </div>
 
-      {editUser  && <EditUserModal user={editUser}  shops={shops} onSave={handleEdit}    onClose={() => setEditUser(null)} />}
-      {grantUser && <GrantScansModal user={grantUser}              onSave={handleGrant}   onClose={() => setGrantUser(null)} />}
-      {payUser   && <PaymentModal    user={payUser}                onSave={handlePayment} onClose={() => setPayUser(null)} />}
+      {editUser && <EditUserModal user={editUser} shops={shops} onSave={handleEdit} onClose={() => setEditUser(null)} />}
       {confirmDel && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <div style={{ background: 'white', borderRadius: 16, padding: '28px 24px', maxWidth: 360, width: '100%' }}>
             <div style={{ fontFamily: 'DM Serif Display', fontSize: 20, marginBottom: 8 }}>Delete User?</div>
             <div style={{ fontSize: 13, color: '#78716C', marginBottom: 20 }}>
-              This will permanently delete <strong>{confirmDel.email}</strong> and all their data. This cannot be undone.
+              This will permanently delete <strong>{confirmDel.email}</strong>. This cannot be undone.
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setConfirmDel(null)} className="btn btn-ghost" style={{ flex: 1 }}>Cancel</button>
@@ -526,47 +354,206 @@ function UsersTab({ users, shops, onRefresh }) {
   );
 }
 
-function ActionBtn({ icon: Icon, title, color, onClick }) {
+// ─── Grant Scans Modal ────────────────────────────────────────────────────────
+function GrantScansModal({ shop, onSave, onClose }) {
+  const [scans, setScans] = useState(10);
+  const [saving, setSaving] = useState(false);
+  async function save() {
+    setSaving(true);
+    try { await onSave(shop._id, scans); onClose(); }
+    catch (e) { alert(e.message); }
+    finally { setSaving(false); }
+  }
   return (
-    <button onClick={onClick} title={title} style={{
-      width: 30, height: 30, borderRadius: 7, border: `1px solid ${color}22`,
-      background: `${color}0d`, color, cursor: 'pointer',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      transition: 'all 0.15s', flexShrink: 0,
-    }}
-      onMouseEnter={e => { e.currentTarget.style.background = `${color}22`; }}
-      onMouseLeave={e => { e.currentTarget.style.background = `${color}0d`; }}
-    >
-      <Icon size={13} />
-    </button>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 340, padding: '28px 24px' }}>
+        <div style={{ fontFamily: 'DM Serif Display', fontSize: 20, marginBottom: 4 }}>Grant Extra Scans</div>
+        <div style={{ fontSize: 12, color: '#78716C', marginBottom: 20 }}>{shop.name}</div>
+        <label style={{ fontSize: 11, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>Scans to grant</label>
+        <input type="number" value={scans} min={1} onChange={e => setScans(e.target.value)}
+          style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid #E7E5E4', fontSize: 15, boxSizing: 'border-box', marginBottom: 20 }} />
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onClose} className="btn btn-ghost" style={{ flex: 1 }}>Cancel</button>
+          <button onClick={save} disabled={saving} className="btn btn-primary" style={{ flex: 1 }}>{saving ? 'Saving…' : 'Grant'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Record Payment Modal ─────────────────────────────────────────────────────
+function PaymentModal({ shop, onSave, onClose }) {
+  const defaultAmt = shop.scanQuota?.monthlyCharge ?? shop.subscription?.monthlyFee ?? 500;
+  const [amount, setAmount] = useState(defaultAmt);
+  const [method, setMethod] = useState('cash');
+  const [note,   setNote]   = useState('');
+  const [saving, setSaving] = useState(false);
+  async function save(e) {
+    e.preventDefault();
+    setSaving(true);
+    try { await onSave(shop._id, { amount: Number(amount), method, note }); onClose(); }
+    catch (e) { alert(e.message); }
+    finally { setSaving(false); }
+  }
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 380, padding: '28px 24px' }}>
+        <div style={{ fontFamily: 'DM Serif Display', fontSize: 20, marginBottom: 4 }}>Record Payment</div>
+        <div style={{ fontSize: 12, color: '#78716C', marginBottom: 20 }}>{shop.name}</div>
+        <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>Amount (Rs)</label>
+            <input type="number" value={amount} onChange={e => setAmount(e.target.value)} required
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 7, border: '1.5px solid #E7E5E4', fontSize: 13, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>Method</label>
+            <select value={method} onChange={e => setMethod(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 7, border: '1.5px solid #E7E5E4', fontSize: 13, background: 'white' }}>
+              {[['cash','Cash'],['esewa','eSewa'],['bank','Bank Transfer'],['other','Other']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>Note (optional)</label>
+            <input value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. May 2026"
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 7, border: '1.5px solid #E7E5E4', fontSize: 13, boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <button type="button" onClick={onClose} className="btn btn-ghost" style={{ flex: 1 }}>Cancel</button>
+            <button type="submit" disabled={saving} className="btn btn-primary" style={{ flex: 1 }}>{saving ? 'Saving…' : 'Record Payment'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Edit Shop Modal (quota + billing settings) ───────────────────────────────
+function EditShopModal({ shop, onSave, onClose }) {
+  const q   = shop.scanQuota   || {};
+  const sub = shop.subscription || {};
+  const [form, setForm] = useState({
+    name:               shop.name,
+    freeScanLimit:      q.freeScanLimit  ?? 20,
+    paidPlanLimit:      q.paidPlanLimit  ?? 0,
+    monthlyCharge:      q.monthlyCharge  ?? 500,
+    billingStatus:      q.billingStatus  ?? 'active',
+    subscriptionStatus: sub.status       || 'trial',
+  });
+  const [saving, setSaving] = useState(false);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  async function save() {
+    setSaving(true);
+    try { await onSave(shop._id, form); onClose(); }
+    catch (e) { alert(e.message); }
+    finally { setSaving(false); }
+  }
+
+  const fld = (label, key, type = 'text', opts) => (
+    <div>
+      <label style={{ fontSize: 11, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>{label}</label>
+      {opts ? (
+        <select value={form[key]} onChange={e => set(key, e.target.value)}
+          style={{ width: '100%', padding: '8px 10px', borderRadius: 7, border: '1.5px solid #E7E5E4', fontSize: 13, background: 'white' }}>
+          {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      ) : (
+        <input type={type} value={form[key]} onChange={e => set(key, e.target.value)}
+          style={{ width: '100%', padding: '8px 10px', borderRadius: 7, border: '1.5px solid #E7E5E4', fontSize: 13, boxSizing: 'border-box' }} />
+      )}
+    </div>
+  );
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 460, padding: '28px 24px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <div style={{ fontFamily: 'DM Serif Display', fontSize: 20 }}>Edit Shop</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#78716C' }}><X size={18} /></button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {fld('Shop Name', 'name')}
+
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.07em', borderTop: '1px solid #F5F5F4', paddingTop: 12, marginTop: 4 }}>
+            Scan Quota (shared by all users in this shop)
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {fld('Free Scans / Month', 'freeScanLimit', 'number')}
+            {fld('Paid Extra Scans', 'paidPlanLimit', 'number')}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {fld('Monthly Charge (Rs)', 'monthlyCharge', 'number')}
+            {fld('Billing Status', 'billingStatus', 'text', [
+              ['active','Active'],['unpaid','Unpaid'],['grace','Grace Period'],['suspended','Suspended'],
+            ])}
+          </div>
+
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.07em', borderTop: '1px solid #F5F5F4', paddingTop: 12, marginTop: 4 }}>
+            Subscription
+          </div>
+          {fld('Subscription Status', 'subscriptionStatus', 'text', [
+            ['trial','Trial'],['active','Active'],['expired','Expired'],
+          ])}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+          <button onClick={onClose} className="btn btn-ghost" style={{ flex: 1 }}>Cancel</button>
+          <button onClick={save} disabled={saving} className="btn btn-primary" style={{ flex: 1 }}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
 // ─── Shops Tab ────────────────────────────────────────────────────────────────
 function ShopsTab({ shops, onRefresh }) {
-  const [expanded, setExpanded] = useState({});
-  const [newName,  setNewName]  = useState('');
-  const [creating, setCreating] = useState(false);
-  const [editId,   setEditId]   = useState(null);
-  const [editName, setEditName] = useState('');
+  const [expanded,   setExpanded]   = useState({});
+  const [newName,    setNewName]    = useState('');
+  const [creating,   setCreating]   = useState(false);
+  const [editShop,   setEditShop]   = useState(null);
+  const [grantShop,  setGrantShop]  = useState(null);
+  const [payShop,    setPayShop]    = useState(null);
 
   async function createShop(e) {
     e.preventDefault();
     if (!newName.trim()) return;
     setCreating(true);
-    try { await adminFetch('/api/admin/shops', { method: 'POST', body: { name: newName.trim() } }); setNewName(''); onRefresh(); }
-    catch (e) { alert(e.message); }
+    try {
+      await adminFetch('/api/admin/shops', { method: 'POST', body: { name: newName.trim() } });
+      setNewName(''); toast('Shop created'); onRefresh();
+    } catch (e) { alert(e.message); }
     finally { setCreating(false); }
   }
 
-  async function saveEdit(id) {
-    await adminFetch(`/api/admin/shops/${id}`, { method: 'PATCH', body: { name: editName.trim() } });
-    setEditId(null); onRefresh();
+  async function handleEditSave(id, form) {
+    await adminFetch(`/api/admin/shops/${id}`, { method: 'PATCH', body: form });
+    toast('Shop updated'); onRefresh();
+  }
+
+  async function handleGrant(id, scans) {
+    await adminFetch(`/api/admin/shops/${id}/grant-scans`, { method: 'POST', body: { scans } });
+    toast(`Granted ${scans} extra scans`); onRefresh();
+  }
+
+  async function handlePayment(id, body) {
+    await adminFetch(`/api/admin/shops/${id}/subscription/payment`, { method: 'POST', body });
+    toast('Payment recorded — subscription extended'); onRefresh();
+  }
+
+  async function handleResetQuota(id) {
+    await adminFetch(`/api/admin/shops/${id}/reset-quota`, { method: 'POST' });
+    toast('Scan quota reset'); onRefresh();
   }
 
   return (
     <div>
-      {/* Create shop */}
       <form onSubmit={createShop} style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
         <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="New shop name…"
           style={{ flex: 1, padding: '9px 14px', borderRadius: 8, border: '1.5px solid #E7E5E4', fontSize: 13 }} />
@@ -577,68 +564,166 @@ function ShopsTab({ shops, onRefresh }) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {shops.length === 0 && <div style={{ textAlign: 'center', padding: 48, color: '#78716C' }}>No shops yet</div>}
-        {shops.map(shop => (
-          <div key={shop._id} style={{ background: 'white', borderRadius: 12, border: '1.5px solid #E7E5E4', overflow: 'hidden' }}>
-            <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
-              onClick={() => setExpanded(e => ({ ...e, [shop._id]: !e[shop._id] }))}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 9, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Store size={17} style={{ color: '#2563EB' }} />
-                </div>
-                {editId === shop._id ? (
-                  <div style={{ display: 'flex', gap: 8 }} onClick={e => e.stopPropagation()}>
-                    <input value={editName} onChange={e => setEditName(e.target.value)}
-                      style={{ padding: '6px 10px', borderRadius: 6, border: '1.5px solid #D6D3D1', fontSize: 13 }} />
-                    <button onClick={() => saveEdit(shop._id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16A34A' }}><Check size={15} /></button>
-                    <button onClick={() => setEditId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626' }}><X size={15} /></button>
+        {shops.map(shop => {
+          const q   = shop.scanQuota   || {};
+          const sub = shop.subscription || {};
+          const pct = Math.min(100, Math.round(((q.used || 0) / Math.max(1, q.total || 20)) * 100));
+          return (
+            <div key={shop._id} style={{ background: 'white', borderRadius: 12, border: '1.5px solid #E7E5E4', overflow: 'hidden' }}>
+              {/* Shop header */}
+              <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, cursor: 'pointer' }}
+                  onClick={() => setExpanded(e => ({ ...e, [shop._id]: !e[shop._id] }))}>
+                  <div style={{ width: 38, height: 38, borderRadius: 9, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Store size={17} style={{ color: '#2563EB' }} />
                   </div>
-                ) : (
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>{shop.name}</div>
-                    <div style={{ fontSize: 11, color: '#78716C' }}>{shop.users?.length || 0} user{shop.users?.length !== 1 ? 's' : ''} · Created {shop.createdAt ? new Date(shop.createdAt).toLocaleDateString('en-IN') : '—'}</div>
-                  </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <button onClick={e => { e.stopPropagation(); setEditId(shop._id); setEditName(shop.name); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#78716C', display: 'flex' }}>
-                  <Edit2 size={13} />
-                </button>
-                {expanded[shop._id] ? <ChevronUp size={15} style={{ color: '#78716C' }} /> : <ChevronDown size={15} style={{ color: '#78716C' }} />}
-              </div>
-            </div>
-
-            {expanded[shop._id] && (
-              <div style={{ borderTop: '1px solid #F5F5F4' }}>
-                {(shop.users || []).length === 0 ? (
-                  <div style={{ padding: '16px 18px', color: '#78716C', fontSize: 13 }}>No users in this shop yet</div>
-                ) : (shop.users || []).map(u => (
-                  <div key={u._id} style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #FAFAF9' }}>
-                    <div style={{ fontSize: 13 }}>{u.email}</div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      {roleBadge(u.role)}
-                      {statusBadge(u.status)}
+                    <div style={{ fontSize: 11, color: '#78716C' }}>
+                      {shop.users?.length || 0} user{shop.users?.length !== 1 ? 's' : ''} · Created {shop.createdAt ? new Date(shop.createdAt).toLocaleDateString('en-IN') : '—'}
                     </div>
                   </div>
-                ))}
+                </div>
+
+                {/* Quota + subscription summary */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginRight: 14 }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 11, color: '#78716C', marginBottom: 2 }}>Scans</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ width: 56, height: 5, background: '#F5F5F4', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: pct >= 90 ? '#DC2626' : pct >= 70 ? '#D97706' : '#16A34A', borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11, color: '#57534E' }}>{q.used || 0}/{q.total || ((q.freeScanLimit ?? 20) + (q.paidPlanLimit ?? 0))}</span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 11, color: '#78716C', marginBottom: 2 }}>Subscription</div>
+                    {subBadge(sub.status)}
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 11, color: '#78716C', marginBottom: 2 }}>Charge</div>
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>Rs {q.monthlyCharge ?? 500}</div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <ActionBtn icon={Edit2}     title="Edit shop settings" color="#2563EB" onClick={() => setEditShop(shop)} />
+                  <ActionBtn icon={CreditCard} title="Record payment"    color="#16A34A" onClick={() => setPayShop(shop)} />
+                  <ActionBtn icon={Gift}       title="Grant scans"       color="#7C3AED" onClick={() => setGrantShop(shop)} />
+                  <ActionBtn icon={RotateCcw}  title="Reset quota"       color="#D97706" onClick={() => handleResetQuota(shop._id)} />
+                  <button onClick={() => setExpanded(e => ({ ...e, [shop._id]: !e[shop._id] }))}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#78716C', display: 'flex', padding: 4 }}>
+                    {expanded[shop._id] ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                  </button>
+                </div>
               </div>
-            )}
+
+              {/* Expanded: users list */}
+              {expanded[shop._id] && (
+                <div style={{ borderTop: '1px solid #F5F5F4' }}>
+                  {(shop.users || []).length === 0 ? (
+                    <div style={{ padding: '16px 18px', color: '#78716C', fontSize: 13 }}>No users in this shop</div>
+                  ) : (shop.users || []).map(u => (
+                    <div key={u._id} style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #FAFAF9' }}>
+                      <div style={{ fontSize: 13 }}>{u.email}</div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        {roleBadge(u.role)}
+                        {statusBadge(u.status)}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Payment history */}
+                  {(sub.payments || []).length > 0 && (
+                    <div style={{ padding: '12px 18px', borderTop: '1px solid #F5F5F4' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Payment History</div>
+                      {[...(sub.payments || [])].reverse().slice(0, 5).map((p, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid #FAFAF9' }}>
+                          <span style={{ color: '#57534E' }}>Rs {p.amount} · {p.method}</span>
+                          <span style={{ color: '#78716C' }}>{p.note} · {p.paidAt ? new Date(p.paidAt).toLocaleDateString('en-IN') : '—'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {editShop  && <EditShopModal  shop={editShop}  onSave={handleEditSave} onClose={() => setEditShop(null)} />}
+      {grantShop && <GrantScansModal shop={grantShop} onSave={handleGrant}   onClose={() => setGrantShop(null)} />}
+      {payShop   && <PaymentModal    shop={payShop}   onSave={handlePayment} onClose={() => setPayShop(null)} />}
+    </div>
+  );
+}
+
+// ─── Dashboard Tab ────────────────────────────────────────────────────────────
+function DashboardTab({ stats, users, shops }) {
+  const nearQuotaShops = shops.filter(s => {
+    const q = s.scanQuota || {};
+    return (q.remaining ?? (q.total - q.used)) <= 3;
+  });
+  const recentUsers = [...users].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 28 }}>
+        <StatCard label="Total Users"      value={stats?.totalUsers}      icon={Users}         color="#1C1917" />
+        <StatCard label="Active Users"     value={stats?.activeUsers}     icon={UserCheck}     color="#16A34A" />
+        <StatCard label="Total Shops"      value={stats?.totalShops}      icon={Building2}     color="#2563EB" />
+        <StatCard label="Scans This Month" value={stats?.scansThisMonth}  icon={ScanLine}      color="#7C3AED" />
+        <StatCard label="Expected Revenue" value={stats?.expectedRevenue != null ? `Rs ${stats.expectedRevenue.toLocaleString('en-IN')}` : '—'} icon={TrendingUp} color="#16A34A" sub="sum of all shop charges" />
+        <StatCard label="Suspended"        value={stats?.suspendedUsers}  icon={UserX}         color="#DC2626" />
+        <StatCard label="Near Quota (≤3)"  value={stats?.nearQuota}       icon={AlertTriangle} color="#D97706" />
+        <StatCard label="Expired Sub"      value={stats?.expiredSub}      icon={XCircle}       color="#DC2626" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div style={{ background: 'white', borderRadius: 12, border: '1.5px solid #E7E5E4', overflow: 'hidden' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid #F5F5F4', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 7 }}>
+            <AlertTriangle size={14} style={{ color: '#D97706' }} /> Near Quota Limit
           </div>
-        ))}
+          {nearQuotaShops.length === 0 ? (
+            <div style={{ padding: '24px 18px', color: '#78716C', fontSize: 13, textAlign: 'center' }}>All shops have sufficient scans</div>
+          ) : nearQuotaShops.map(s => (
+            <div key={s._id} style={{ padding: '10px 18px', borderBottom: '1px solid #FAFAF9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</div>
+              <Badge color="yellow">{s.scanQuota?.remaining ?? 0} left</Badge>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ background: 'white', borderRadius: 12, border: '1.5px solid #E7E5E4', overflow: 'hidden' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid #F5F5F4', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 7 }}>
+            <Users size={14} style={{ color: '#2563EB' }} /> Recent Registrations
+          </div>
+          {recentUsers.map(u => (
+            <div key={u._id} style={{ padding: '10px 18px', borderBottom: '1px solid #FAFAF9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{u.shopName || u.email}</div>
+                <div style={{ fontSize: 11, color: '#78716C' }}>{u.email}</div>
+              </div>
+              <div style={{ fontSize: 11, color: '#78716C' }}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN') : '—'}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
-function SettingsTab({ onRefresh }) {
-  const [defaults, setDefaults]   = useState({ freeScanLimit: 20, monthlyCharge: 500 });
-  const [loading,  setLoading]    = useState(true);
-  const [saving,   setSaving]     = useState(false);
-  const [msg,      setMsg]        = useState('');
-  const [pwOpen,   setPwOpen]     = useState(false);
-  const [pw,       setPw]         = useState({ current: '', new: '', confirm: '' });
-  const [pwMsg,    setPwMsg]      = useState('');
+function SettingsTab() {
+  const [defaults, setDefaults] = useState({ freeScanLimit: 20, monthlyCharge: 500 });
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
+  const [msg,      setMsg]      = useState('');
+  const [pwOpen,   setPwOpen]   = useState(false);
+  const [pw,       setPw]       = useState({ current: '', new: '', confirm: '' });
+  const [pwMsg,    setPwMsg]    = useState('');
 
   useEffect(() => {
     adminFetch('/api/admin/defaults').then(d => { setDefaults(d); setLoading(false); }).catch(() => setLoading(false));
@@ -669,15 +754,11 @@ function SettingsTab({ onRefresh }) {
 
   return (
     <div style={{ maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Default quota settings */}
       <div style={{ background: 'white', borderRadius: 12, border: '1.5px solid #E7E5E4', padding: '20px 22px' }}>
-        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Default New User Settings</div>
-        <div style={{ fontSize: 12, color: '#78716C', marginBottom: 18 }}>Applied to all newly registered shops</div>
+        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Default New Shop Settings</div>
+        <div style={{ fontSize: 12, color: '#78716C', marginBottom: 18 }}>Applied when a new shop registers</div>
         <form onSubmit={saveDefaults} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {[
-            ['Default Free Scans / Month', 'freeScanLimit'],
-            ['Default Monthly Charge (Rs)', 'monthlyCharge'],
-          ].map(([label, key]) => (
+          {[['Default Free Scans / Month', 'freeScanLimit'], ['Default Monthly Charge (Rs)', 'monthlyCharge']].map(([label, key]) => (
             <div key={key}>
               <label style={{ fontSize: 11, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>{label}</label>
               <input type="number" value={defaults[key] || ''} onChange={e => setDefaults(d => ({ ...d, [key]: e.target.value }))}
@@ -689,7 +770,6 @@ function SettingsTab({ onRefresh }) {
         </form>
       </div>
 
-      {/* Change admin password */}
       <div style={{ background: 'white', borderRadius: 12, border: '1.5px solid #E7E5E4', overflow: 'hidden' }}>
         <button onClick={() => setPwOpen(v => !v)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 22px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
           Change Admin Password
@@ -716,17 +796,16 @@ function SettingsTab({ onRefresh }) {
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function AdminDashboard({ onLogout }) {
-  const [stats,    setStats]    = useState(null);
-  const [users,    setUsers]    = useState([]);
-  const [shops,    setShops]    = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [loadErr,  setLoadErr]  = useState('');
-  const [tab,      setTab]      = useState('dashboard');
+  const [stats,   setStats]   = useState(null);
+  const [users,   setUsers]   = useState([]);
+  const [shops,   setShops]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState('');
+  const [tab,     setTab]     = useState('dashboard');
   const toasts = useToastProvider();
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setLoadErr('');
+    setLoading(true); setLoadErr('');
     try {
       const [s, u, sh] = await Promise.all([
         adminFetch('/api/admin/stats'),
@@ -734,11 +813,10 @@ export default function AdminDashboard({ onLogout }) {
         adminFetch('/api/admin/shops'),
       ]);
       setStats(s);
-      setUsers(u.users || []);
+      setUsers(u.users  || []);
       setShops(sh.shops || []);
     } catch (e) {
-      console.error('Admin load error:', e);
-      setLoadErr(e.message || 'Failed to load data. Check server connection.');
+      setLoadErr(e.message || 'Failed to load data.');
     }
     finally { setLoading(false); }
   }, []);
@@ -746,20 +824,14 @@ export default function AdminDashboard({ onLogout }) {
   useEffect(() => { load(); }, [load]);
 
   const TABS = [
-    { id: 'dashboard', label: 'Dashboard',  icon: TrendingUp },
-    { id: 'users',     label: `Users (${users.length})`, icon: Users },
-    { id: 'shops',     label: `Shops (${shops.length})`, icon: Building2 },
-    { id: 'settings',  label: 'Settings',   icon: Settings },
+    { id: 'dashboard', label: 'Dashboard',           icon: TrendingUp },
+    { id: 'users',     label: `Users (${users.length})`,  icon: Users },
+    { id: 'shops',     label: `Shops (${shops.length})`,  icon: Building2 },
+    { id: 'settings',  label: 'Settings',            icon: Settings },
   ];
-
-  const refreshWithToast = useCallback(async () => {
-    await load();
-    toast('Refreshed');
-  }, [load]);
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAFAF9' }}>
-      {/* Header */}
       <div style={{ background: '#1C1917', color: 'white', padding: '0 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 54, position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ fontFamily: 'DM Serif Display', fontSize: 19 }}>Tailor Manager</div>
@@ -767,7 +839,8 @@ export default function AdminDashboard({ onLogout }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{users.length} users · {shops.length} shops</span>
-          <button onClick={refreshWithToast} disabled={loading} style={{ background: 'none', border: 'none', cursor: 'pointer', color: loading ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
+          <button onClick={() => { load().then(() => toast('Refreshed')); }} disabled={loading}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: loading ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
             <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
           </button>
           <button onClick={onLogout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
@@ -776,12 +849,10 @@ export default function AdminDashboard({ onLogout }) {
         </div>
       </div>
 
-      {/* Tab bar */}
       <div style={{ background: 'white', borderBottom: '2px solid #E7E5E4', padding: '0 28px', display: 'flex', gap: 2 }}>
         {TABS.map(t => <Tab key={t.id} {...t} active={tab === t.id} onClick={setTab} />)}
       </div>
 
-      {/* Load error banner */}
       {loadErr && (
         <div style={{ background: '#FEF2F2', borderBottom: '1px solid #FECACA', padding: '12px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 13, color: '#DC2626' }}>⚠ {loadErr}</span>
@@ -798,10 +869,10 @@ export default function AdminDashboard({ onLogout }) {
           </div>
         ) : (
           <>
-            {tab === 'dashboard' && <DashboardTab stats={stats} users={users} onRefresh={load} />}
+            {tab === 'dashboard' && <DashboardTab stats={stats} users={users} shops={shops} />}
             {tab === 'users'     && <UsersTab users={users} shops={shops} onRefresh={load} />}
             {tab === 'shops'     && <ShopsTab shops={shops} onRefresh={load} />}
-            {tab === 'settings'  && <SettingsTab onRefresh={load} />}
+            {tab === 'settings'  && <SettingsTab />}
           </>
         )}
       </div>

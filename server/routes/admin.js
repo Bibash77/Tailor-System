@@ -19,9 +19,12 @@ function resolveSubStatus(sub = {}) {
   return s;
 }
 
-function enrichUser(u, shops = {}, month) {
-  const q   = u.scanQuota   || {};
-  const sub = u.subscription || {};
+// Enrich a user with their shop's subscription + quota data
+function enrichUser(u, shopsMap = {}, month) {
+  const shop = shopsMap[u.shopId] || {};
+  const q    = shop.scanQuota   || {};
+  const sub  = shop.subscription || {};
+
   const isCurrentMonth = q.month === month;
   const used      = isCurrentMonth ? (q.used || 0) : 0;
   const freeLimit = q.freeScanLimit ?? 20;
@@ -31,22 +34,21 @@ function enrichUser(u, shops = {}, month) {
   const nearQuota = remaining <= 3 && total > 0;
 
   return {
-    _id:          u._id,
-    email:        u.email,
-    shopName:     u.shopName,
-    shopId:       u.shopId   || null,
-    shop:         shops[u.shopId] || null,
-    role:         u.role     || 'shop_admin',
-    status:       u.status   || 'active',
-    createdAt:    u.createdAt,
+    _id:       u._id,
+    email:     u.email,
+    shopName:  u.shopName,
+    shopId:    u.shopId || null,
+    shop:      shop._id ? { _id: shop._id, name: shop.name } : null,
+    role:      u.role   || 'shop_admin',
+    status:    u.status || 'active',
+    createdAt: u.createdAt,
     scanQuota: {
-      freeScanLimit:  freeLimit,
-      paidPlanLimit:  paidLimit,
+      freeScanLimit: freeLimit,
+      paidPlanLimit: paidLimit,
       used,
       remaining,
-      monthlyCharge:  q.monthlyCharge  ?? 500,
-      billingStatus:  q.billingStatus  ?? 'active',
-      renewDate:      q.renewDate      ?? null,
+      monthlyCharge: q.monthlyCharge ?? 500,
+      billingStatus: q.billingStatus ?? 'active',
       nearQuota,
       month,
     },
@@ -68,25 +70,29 @@ router.get('/stats', async (req, res) => {
     const from  = new Date(month + '-01T00:00:00.000Z');
 
     const [users, shops, scansThisMonth, totalScans] = await Promise.all([
-      db.collection('users').find({}, { projection: { scanQuota: 1, status: 1, subscription: 1 } }).toArray(),
-      db.collection('shops').countDocuments(),
+      db.collection('users').find({}, { projection: { status: 1, shopId: 1 } }).toArray(),
+      db.collection('shops').find({}).toArray(),
       db.collection('scanQueue').countDocuments({ createdAt: { $gte: from } }),
       db.collection('scanQueue').countDocuments(),
     ]);
 
-    let activeUsers = 0, suspendedUsers = 0, nearQuota = 0, expiredSub = 0, expectedRevenue = 0;
+    // User-level stats
+    let activeUsers = 0, suspendedUsers = 0;
     for (const u of users) {
       const s = u.status || 'active';
       if (s === 'active')    activeUsers++;
       if (s === 'suspended') suspendedUsers++;
+    }
 
-      const q   = u.scanQuota  || {};
-      const sub = u.subscription || {};
+    // Shop-level billing stats
+    let nearQuota = 0, expiredSub = 0, expectedRevenue = 0;
+    for (const shop of shops) {
+      const q   = shop.scanQuota   || {};
+      const sub = shop.subscription || {};
       const isCurrent = q.month === month;
       const used  = isCurrent ? (q.used || 0) : 0;
       const total = (q.freeScanLimit ?? 20) + (q.paidPlanLimit ?? 0);
       if (Math.max(0, total - used) <= 3) nearQuota++;
-
       if (resolveSubStatus(sub) === 'expired') expiredSub++;
       expectedRevenue += q.monthlyCharge ?? 500;
     }
@@ -95,7 +101,7 @@ router.get('/stats', async (req, res) => {
       totalUsers: users.length,
       activeUsers,
       suspendedUsers,
-      totalShops: shops,
+      totalShops: shops.length,
       scansThisMonth,
       totalScans,
       nearQuota,
@@ -120,47 +126,21 @@ router.get('/users', async (req, res) => {
       db.collection('shops').find({}).toArray(),
     ]);
 
-    const shops = Object.fromEntries(shopList.map(s => [s._id, s]));
-    res.json({ users: users.map(u => enrichUser(u, shops, month)) });
+    const shopsMap = Object.fromEntries(shopList.map(s => [s._id, s]));
+    res.json({ users: users.map(u => enrichUser(u, shopsMap, month)) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ─── PATCH /api/admin/users/:id ───────────────────────────────────────────────
+// ─── PATCH /api/admin/users/:id — role, status, shopId only ──────────────────
 router.patch('/users/:id', async (req, res) => {
   try {
-    const { role, status, freeScanLimit, paidPlanLimit, monthlyCharge, billingStatus, shopId } = req.body;
+    const { role, status, shopId } = req.body;
     const $set = {};
-    if (role          != null) $set.role                       = role;
-    if (status        != null) $set.status                     = status;
-    if (shopId        != null) $set.shopId                     = shopId;
-    if (freeScanLimit != null) $set['scanQuota.freeScanLimit'] = Math.max(0, Number(freeScanLimit));
-    if (paidPlanLimit != null) $set['scanQuota.paidPlanLimit'] = Math.max(0, Number(paidPlanLimit));
-    if (monthlyCharge != null) $set['scanQuota.monthlyCharge'] = Math.max(0, Number(monthlyCharge));
-    if (billingStatus != null) $set['scanQuota.billingStatus'] = billingStatus;
+    if (role   != null) $set.role   = role;
+    if (status != null) $set.status = status;
+    if (shopId != null) $set.shopId = shopId;
+    if (Object.keys($set).length === 0) return res.json({ ok: true });
     await getDB().collection('users').updateOne({ _id: uid(req.params.id) }, { $set });
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ─── POST /api/admin/users/:id/reset-quota ────────────────────────────────────
-router.post('/users/:id/reset-quota', async (req, res) => {
-  try {
-    await getDB().collection('users').updateOne(
-      { _id: uid(req.params.id) },
-      { $set: { 'scanQuota.used': 0, 'scanQuota.month': MONTH() } },
-    );
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ─── POST /api/admin/users/:id/grant-scans ────────────────────────────────────
-router.post('/users/:id/grant-scans', async (req, res) => {
-  try {
-    const extra = Math.max(1, Number(req.body.scans) || 0);
-    await getDB().collection('users').updateOne(
-      { _id: uid(req.params.id) },
-      { $inc: { 'scanQuota.paidPlanLimit': extra } },
-    );
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -188,28 +168,129 @@ router.get('/shops', async (req, res) => {
       byShop[u.shopId].push({ _id: u._id, email: u.email, role: u.role || 'shop_admin', status: u.status || 'active' });
     }
 
-    res.json({ shops: shops.map(s => ({ ...s, users: byShop[s._id] || [] })) });
+    const month = MONTH();
+    res.json({
+      shops: shops.map(s => {
+        const q   = s.scanQuota   || {};
+        const sub = s.subscription || {};
+        const isCurrent = q.month === month;
+        const used  = isCurrent ? (q.used || 0) : 0;
+        const total = (q.freeScanLimit ?? 20) + (q.paidPlanLimit ?? 0);
+        return {
+          ...s,
+          users: byShop[s._id] || [],
+          scanQuota: { ...q, used, remaining: Math.max(0, total - used), total },
+          subscription: { ...sub, status: resolveSubStatus(sub) },
+        };
+      }),
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ─── POST /api/admin/shops ────────────────────────────────────────────────────
 router.post('/shops', async (req, res) => {
   try {
+    const db = getDB();
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: 'Shop name required' });
-    const shop = { _id: crypto.randomUUID(), name: name.trim(), createdAt: new Date() };
-    await getDB().collection('shops').insertOne(shop);
+
+    // Get admin defaults
+    let defaults = { freeScanLimit: 20, monthlyCharge: 500 };
+    try {
+      const d = await db.collection('settings').findOne({ _id: 'adminDefaults' });
+      if (d) defaults = { ...defaults, ...d };
+    } catch {}
+
+    const trialEndsAt = new Date(Date.now() + 30 * 86_400_000);
+    const shop = {
+      _id:       crypto.randomUUID(),
+      name:      name.trim(),
+      createdAt: new Date(),
+      scanQuota: {
+        freeScanLimit: defaults.freeScanLimit,
+        paidPlanLimit: 0,
+        used:          0,
+        monthlyCharge: defaults.monthlyCharge,
+        billingStatus: 'active',
+        renewDate:     null,
+        month:         '',
+      },
+      subscription: {
+        status:      'trial',
+        trialEndsAt,
+        billedUntil: null,
+        monthlyFee:  defaults.monthlyCharge,
+        payments:    [],
+      },
+    };
+    await db.collection('shops').insertOne(shop);
     res.json({ shop });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ─── PATCH /api/admin/shops/:id ───────────────────────────────────────────────
+// ─── PATCH /api/admin/shops/:id — name + quota + billing settings ─────────────
 router.patch('/shops/:id', async (req, res) => {
   try {
-    const { name } = req.body;
-    if (!name) return res.status(400).json({ error: 'Shop name required' });
-    await getDB().collection('shops').updateOne({ _id: req.params.id }, { $set: { name: name.trim() } });
+    const { name, freeScanLimit, paidPlanLimit, monthlyCharge, billingStatus, subscriptionStatus } = req.body;
+    const $set = {};
+    if (name              != null) $set.name                            = name.trim();
+    if (freeScanLimit     != null) $set['scanQuota.freeScanLimit']      = Math.max(0, Number(freeScanLimit));
+    if (paidPlanLimit     != null) $set['scanQuota.paidPlanLimit']      = Math.max(0, Number(paidPlanLimit));
+    if (monthlyCharge     != null) $set['scanQuota.monthlyCharge']      = Math.max(0, Number(monthlyCharge));
+    if (billingStatus     != null) $set['scanQuota.billingStatus']      = billingStatus;
+    if (subscriptionStatus!= null) $set['subscription.status']         = subscriptionStatus;
+    if (Object.keys($set).length === 0) return res.json({ ok: true });
+    await getDB().collection('shops').updateOne({ _id: req.params.id }, { $set });
     res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── POST /api/admin/shops/:id/reset-quota ───────────────────────────────────
+router.post('/shops/:id/reset-quota', async (req, res) => {
+  try {
+    await getDB().collection('shops').updateOne(
+      { _id: req.params.id },
+      { $set: { 'scanQuota.used': 0, 'scanQuota.month': MONTH() } },
+    );
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── POST /api/admin/shops/:id/grant-scans ───────────────────────────────────
+router.post('/shops/:id/grant-scans', async (req, res) => {
+  try {
+    const extra = Math.max(1, Number(req.body.scans) || 0);
+    await getDB().collection('shops').updateOne(
+      { _id: req.params.id },
+      { $inc: { 'scanQuota.paidPlanLimit': extra } },
+    );
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── POST /api/admin/shops/:id/subscription/payment ──────────────────────────
+router.post('/shops/:id/subscription/payment', async (req, res) => {
+  try {
+    const { amount, method = 'cash', note = '' } = req.body;
+    const db   = getDB();
+    const shop = await db.collection('shops').findOne({ _id: req.params.id });
+    if (!shop) return res.status(404).json({ error: 'Shop not found' });
+
+    const sub  = shop.subscription || {};
+    const now  = new Date();
+    const base = sub.billedUntil && new Date(sub.billedUntil) > now ? new Date(sub.billedUntil) : now;
+    const billedUntil = new Date(base);
+    billedUntil.setMonth(billedUntil.getMonth() + 1);
+
+    const payment = { amount: Number(amount) || sub.monthlyFee || 500, method, note, paidAt: now };
+    await db.collection('shops').updateOne(
+      { _id: req.params.id },
+      {
+        $set:  { 'subscription.status': 'active', 'subscription.billedUntil': billedUntil },
+        $push: { 'subscription.payments': payment },
+      },
+    );
+    res.json({ ok: true, billedUntil });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -237,44 +318,10 @@ router.patch('/defaults', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ─── Subscription / payment routes (kept from before) ─────────────────────────
-router.patch('/users/:id/subscription', async (req, res) => {
-  try {
-    const { monthlyFee, status } = req.body;
-    const $set = {};
-    if (monthlyFee != null) $set['subscription.monthlyFee'] = Math.max(0, Number(monthlyFee));
-    if (status)             $set['subscription.status']     = status;
-    await getDB().collection('users').updateOne({ _id: uid(req.params.id) }, { $set });
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-router.post('/users/:id/subscription/payment', async (req, res) => {
-  try {
-    const { amount, method = 'cash', note = '' } = req.body;
-    const db   = getDB();
-    const user = await db.collection('users').findOne({ _id: uid(req.params.id) });
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
-    const sub  = user.subscription || {};
-    const now  = new Date();
-    const base = sub.billedUntil && new Date(sub.billedUntil) > now ? new Date(sub.billedUntil) : now;
-    const billedUntil = new Date(base);
-    billedUntil.setMonth(billedUntil.getMonth() + 1);
-
-    const payment = { amount: Number(amount) || sub.monthlyFee || 500, method, note, paidAt: now };
-    await db.collection('users').updateOne(
-      { _id: uid(req.params.id) },
-      { $set: { 'subscription.status': 'active', 'subscription.billedUntil': billedUntil }, $push: { 'subscription.payments': payment } },
-    );
-    res.json({ ok: true, billedUntil });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 // ─── GET /api/admin/scan-history ─────────────────────────────────────────────
 router.get('/scan-history', async (req, res) => {
   try {
-    const db   = getDB();
+    const db    = getDB();
     const month = req.query.month || MONTH();
     const from  = new Date(month + '-01T00:00:00.000Z');
     const rows  = await db.collection('scanQueue')

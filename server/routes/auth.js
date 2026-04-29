@@ -56,17 +56,19 @@ function resolveSubStatus(sub = {}) {
   return status;
 }
 
-function publicUser(u) {
-  const sub    = u.subscription || {};
+async function publicUser(u, db) {
+  const shop   = u.shopId ? await db.collection('shops').findOne({ _id: u.shopId }) : null;
+  const sub    = shop?.subscription || {};
   const status = resolveSubStatus(sub);
   return {
     email:    u.email,
     shopName: u.shopName,
+    status:   u.status || 'active',
     subscription: {
       status,
-      trialEndsAt: sub.trialEndsAt  || null,
-      billedUntil: sub.billedUntil  || null,
-      monthlyFee:  sub.monthlyFee   ?? DEFAULT_FEE,
+      trialEndsAt: sub.trialEndsAt || null,
+      billedUntil: sub.billedUntil || null,
+      monthlyFee:  sub.monthlyFee  ?? DEFAULT_FEE,
     },
   };
 }
@@ -95,34 +97,21 @@ router.post('/register', async (req, res) => {
       if (d) defaults = { ...defaults, ...d };
     } catch {}
 
-    // Create shop
-    const shopId = crypto.randomUUID();
+    // Create shop (subscription + quota live on the shop, shared by all its users)
+    const shopId      = crypto.randomUUID();
+    const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 86_400_000);
     await db.collection('shops').insertOne({
       _id:       shopId,
       name:      shopName.trim(),
       createdAt: new Date(),
-    });
-
-    const passwordHash = await bcrypt.hash(password, 12);
-    const trialEndsAt  = new Date(Date.now() + TRIAL_DAYS * 86_400_000);
-    const doc = {
-      email:        email.trim().toLowerCase(),
-      shopName:     shopName.trim(),
-      passwordHash,
-      createdAt:    new Date(),
-      resetToken:   null,
-      resetExpiry:  null,
-      shopId,
-      role:         'shop_admin',
-      status:       'active',
       scanQuota: {
-        freeScanLimit:  defaults.freeScanLimit,
-        used:           0,
-        paidPlanLimit:  0,
-        monthlyCharge:  defaults.monthlyCharge,
-        billingStatus:  'active',
-        renewDate:      null,
-        month:          '',
+        freeScanLimit: defaults.freeScanLimit,
+        used:          0,
+        paidPlanLimit: 0,
+        monthlyCharge: defaults.monthlyCharge,
+        billingStatus: 'active',
+        renewDate:     null,
+        month:         '',
       },
       subscription: {
         status:      'trial',
@@ -131,11 +120,24 @@ router.post('/register', async (req, res) => {
         monthlyFee:  defaults.monthlyCharge,
         payments:    [],
       },
+    });
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const doc = {
+      email:       email.trim().toLowerCase(),
+      shopName:    shopName.trim(),
+      passwordHash,
+      createdAt:   new Date(),
+      resetToken:  null,
+      resetExpiry: null,
+      shopId,
+      role:        'shop_admin',
+      status:      'active',
     };
 
     const result = await db.collection('users').insertOne(doc);
     doc._id = result.insertedId;
-    res.status(201).json({ token: signToken(doc), user: publicUser(doc) });
+    res.status(201).json({ token: signToken(doc), user: await publicUser(doc, db) });
   } catch (err) {
     console.error('Register:', err);
     res.status(500).json({ error: 'Server error' });
@@ -163,7 +165,8 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
-    res.json({ token: signToken(user), user: publicUser(user) });
+    const db = getDB();
+    res.json({ token: signToken(user), user: await publicUser(user, db) });
   } catch (err) {
     console.error('Login:', err);
     res.status(500).json({ error: 'Server error' });
@@ -173,14 +176,10 @@ router.post('/login', async (req, res) => {
 // ─── GET /api/auth/me ─────────────────────────────────────────────────────────
 router.get('/me', guard, async (req, res) => {
   try {
-    const user = await getDB().collection('users').findOne({ email: req.user.email });
+    const db   = getDB();
+    const user = await db.collection('users').findOne({ email: req.user.email });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    // Auto-persist expired status so DB stays in sync
-    const pub = publicUser(user);
-    if (pub.subscription.status === 'expired' && user.subscription?.status !== 'expired') {
-      await getDB().collection('users').updateOne({ email: req.user.email }, { $set: { 'subscription.status': 'expired' } });
-    }
-    res.json({ user: pub });
+    res.json({ user: await publicUser(user, db) });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -253,7 +252,7 @@ router.patch('/email', guard, async (req, res) => {
     );
 
     const updatedUser = { ...user, email };
-    res.json({ token: signToken(updatedUser), user: publicUser(updatedUser) });
+    res.json({ token: signToken(updatedUser), user: await publicUser(updatedUser, getDB()) });
   } catch (err) {
     console.error('Change email:', err);
     res.status(500).json({ error: 'Server error' });
