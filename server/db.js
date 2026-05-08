@@ -1,15 +1,19 @@
 const { MongoClient } = require('mongodb');
 
-const client = new MongoClient(process.env.MONGO_URI, {
+const MONGO_OPTIONS = {
   maxPoolSize: 10,
   minPoolSize: 1,
   serverSelectionTimeoutMS: 5000,
   connectTimeoutMS: 10000,
   socketTimeoutMS: 45000,
-});
+};
+
+let client = null;
 let db = null;
 
 async function connectDB() {
+  if (!process.env.MONGO_URI) throw new Error('MONGO_URI environment variable is not set');
+  if (!client) client = new MongoClient(process.env.MONGO_URI, MONGO_OPTIONS);
   await client.connect();
   db = client.db('tailor-app');
   // Background index creation — don't block startup
