@@ -4,7 +4,7 @@ import {
   kaligadhsDB, assignmentsDB, ordersDB, salaryPaymentsDB,
 } from '../db';
 import { generateUUID, formatCurrency, formatDate, applyEdit } from '../utils';
-import { Modal, Avatar, EmptyState, ItemTag, FormGroup, HistoryModal, PageHelp } from '../components/UI';
+import { Modal, Avatar, EmptyState, ItemTag, FormGroup, HistoryModal, PageHelp, TableSkeleton } from '../components/UI';
 
 // ─── ADVANCE BALANCE HELPER ───────────────────────────────────────────────────
 function computeAdvanceBalance(payments) {
@@ -312,7 +312,7 @@ export default function Kaligadh({ itemCategories = [] }) {
         {/* ── WORKER LIST ── */}
         <div className="card">
           {loading ? (
-            <div style={{ padding: 48, textAlign: 'center', color: 'var(--ink-3)' }}>Loading...</div>
+            <TableSkeleton rows={4} cols={5} />
           ) : enriched.length === 0 ? (
             <EmptyState
               icon={<span style={{ fontSize: 32 }}>🧵</span>}

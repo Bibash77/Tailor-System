@@ -7,7 +7,7 @@ const subCheck      = require('../server/middleware/subscriptionCheck');
 
 const app = express();
 
-let isConnected = false;
+let dbInstance = null;
 
 const ALLOWED_ORIGINS = [
   process.env.FRONTEND_URL,
@@ -28,14 +28,14 @@ app.use(express.json({ limit: '20mb' }));
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.use(async (req, res, next) => {
-  if (!isConnected) {
+  if (!dbInstance) {
     try {
-      const db = await connectDB();
-      isConnected = true;
-      require('../server/services/scanTracker').init(db);
-      await seedAdmin(db);
+      dbInstance = await connectDB();
+      require('../server/services/scanTracker').init(dbInstance);
+      await seedAdmin(dbInstance);
     } catch (err) {
-      return res.status(500).json({ error: 'Database connection failed' });
+      console.error('DB connect error:', err.message);
+      return res.status(503).json({ error: 'Service temporarily unavailable. Please try again.' });
     }
   }
   next();

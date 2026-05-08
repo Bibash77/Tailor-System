@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import { PageHelp } from '../components/UI';
+import { PageHelp, TableSkeleton } from '../components/UI';
 import { activityDB, ordersDB, dealersDB } from '../db';
 import { formatCurrency, formatDate } from '../utils';
 
@@ -97,7 +97,7 @@ export default function Activity({ onNavigateOrder }) {
 
         <div className="card">
           {loading
-            ? <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-3)' }}>Loading...</div>
+            ? <TableSkeleton rows={6} cols={3} />
             : filtered.length === 0
             ? <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--ink-3)' }}>
                 <div style={{ fontSize: 32, marginBottom: 12 }}>📒</div>

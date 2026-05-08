@@ -5,7 +5,7 @@ import {
   formatCurrency, formatDate,
   monthKey, monthLabel, prevMonthKey, nextMonthKey, entryMonthKey,
 } from '../utils';
-import { EmptyState, PageHelp } from '../components/UI';
+import { EmptyState, PageHelp, TableSkeleton } from '../components/UI';
 
 // ─── PDF EXPORT ───────────────────────────────────────────────────────────────
 
@@ -274,7 +274,7 @@ export default function Finance({ onNavigate }) {
           </div>
 
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-3)' }}>Loading...</div>
+            <TableSkeleton rows={5} cols={5} />
           ) : filtered.length === 0 ? (
             <EmptyState
               icon={<span style={{ fontSize: 32 }}>📒</span>}

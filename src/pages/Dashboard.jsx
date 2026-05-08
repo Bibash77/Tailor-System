@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, ArrowRight, Download, TrendingUp, TrendingDown, Minus, ScanLine } from 'lucide-react';
 import { ordersDB, dealersDB, activityDB, expensesDB, scanQueueDB } from '../db';
 import { formatCurrency, formatDate, monthKey, monthLabel, prevMonthKey, nextMonthKey, entryMonthKey } from '../utils';
-import { PageHelp } from '../components/UI';
+import { PageHelp, CardSkeleton, TableSkeleton } from '../components/UI';
 
 // ─── SPARKLINE ────────────────────────────────────────────────────────────────
 
@@ -347,8 +347,17 @@ export default function Dashboard({ onNavigate, onNavigateOrder }) {
 
   if (loading) {
     return (
-      <div style={{ padding: 60, textAlign: 'center', color: 'var(--ink-3)' }}>
-        Loading…
+      <div style={{ padding: 24 }}>
+        <div className="page-header">
+          <div>
+            <div className="skeleton" style={{ height: 24, width: 140, marginBottom: 8 }} />
+            <div className="skeleton" style={{ height: 14, width: 220 }} />
+          </div>
+        </div>
+        <CardSkeleton count={4} />
+        <div style={{ marginTop: 24 }}>
+          <TableSkeleton rows={5} cols={4} />
+        </div>
       </div>
     );
   }

@@ -10,44 +10,45 @@ function normalize(doc) {
 
 router.get('/', async (req, res) => {
   try {
-    const filter = {};
+    const filter = { shopId: req.user.shopId };
     if (req.query.category)      filter.category      = req.query.category;
     if (req.query.paymentStatus) filter.paymentStatus = req.query.paymentStatus;
     const docs = await getDB().collection('expenses').find(filter).sort({ date: -1 }).toArray();
     res.json(docs.map(normalize));
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error(e); res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 router.get('/:id', async (req, res) => {
   try {
-    const doc = await getDB().collection('expenses').findOne({ _id: req.params.id });
+    const doc = await getDB().collection('expenses').findOne({ _id: req.params.id, shopId: req.user.shopId });
     if (!doc) return res.status(404).json({ error: 'Not found' });
     res.json(normalize(doc));
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error(e); res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 router.post('/', async (req, res) => {
   try {
     const { id, ...rest } = req.body;
+    const shopId = req.user.shopId;
     await getDB().collection('expenses').replaceOne(
-      { _id: id }, { _id: id, ...rest }, { upsert: true }
+      { _id: id }, { _id: id, shopId, ...rest }, { upsert: true }
     );
-    res.json({ id, ...rest });
+    res.json({ id, shopId, ...rest });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error(e); res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 router.delete('/:id', async (req, res) => {
   try {
-    await getDB().collection('expenses').deleteOne({ _id: req.params.id });
+    await getDB().collection('expenses').deleteOne({ _id: req.params.id, shopId: req.user.shopId });
     res.json({ deleted: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error(e); res.status(500).json({ error: 'Internal server error' });
   }
 });
 

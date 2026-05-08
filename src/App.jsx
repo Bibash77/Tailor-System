@@ -50,6 +50,27 @@ const NAV = [
   { id: 'settings',  label: 'Settings',   icon: SettingsIcon },
 ];
 
+// ─── Full-page loader ─────────────────────────────────────────────────────────
+
+function AppLoader({ label }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#FAFAF9' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontFamily: 'DM Serif Display', fontSize: 28, color: '#1C1917', marginBottom: 20 }}>
+          {label}
+        </div>
+        <div style={{
+          width: 36, height: 36, border: '3px solid #E7E5E4',
+          borderTopColor: '#1C1917', borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+          margin: '0 auto 12px',
+        }} />
+        <div style={{ fontSize: 12, color: '#A8A29E', letterSpacing: '0.05em' }}>Loading…</div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Auth screen ──────────────────────────────────────────────────────────────
 
 function AuthScreen() {
@@ -108,16 +129,7 @@ function AppShell() {
   function handleNewOrderFromScan(scan)   { setNewOrderPrefill({ ...scan, fromScan: true }); setNewOrderFlow('new'); }
   function handleCancelNewOrder()         { setNewOrderFlow(null); setNewOrderPrefill(null); setPage('orders'); }
 
-  if (!dbReady) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#FAFAF9' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontFamily: 'DM Serif Display', fontSize: 28, color: '#1C1917', marginBottom: 8 }}>
-          {user.shopName || 'Tailor Manager'}
-        </div>
-        <div style={{ fontSize: 13, color: '#78716C' }}>Loading…</div>
-      </div>
-    </div>
-  );
+  if (!dbReady) return <AppLoader label={user.shopName || 'Tailor Manager'} />;
 
   let content;
   if (newOrderFlow === 'new') {
@@ -231,14 +243,7 @@ function AppContent() {
 
   if (isAdminMode) return <AdminShell />;
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#FAFAF9' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontFamily: 'DM Serif Display', fontSize: 28, color: '#1C1917', marginBottom: 8 }}>Tailor Manager</div>
-        <div style={{ fontSize: 13, color: '#78716C' }}>Loading…</div>
-      </div>
-    </div>
-  );
+  if (loading) return <AppLoader label="Tailor Manager" />;
 
   if (resetToken) return <ResetPassword token={resetToken} onDone={() => window.location.replace('/')} />;
   if (!user)      return <AuthScreen />;

@@ -36,7 +36,7 @@ router.post('/login', async (req, res) => {
     );
     res.json({ token, admin: { email: admin.email } });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error(e); res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -54,7 +54,7 @@ router.post('/change-password', require('../middleware/adminAuth'), async (req, 
     );
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error(e); res.status(500).json({ error: 'Internal server error' });
   }
 });
 

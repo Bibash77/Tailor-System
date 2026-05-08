@@ -9,7 +9,7 @@ import {
   generateUUID, generateBillNo, formatCurrency, formatDate, todayISO,
   computeDealerStatus, getDaysUntilDue, DEALER_CATEGORIES, applyEdit
 } from '../utils';
-import { Modal, SearchBar, Badge, EmptyState, FormGroup, HistoryModal, PageHelp } from '../components/UI';
+import { Modal, SearchBar, Badge, EmptyState, FormGroup, HistoryModal, PageHelp, TableSkeleton, LoadingSpinner } from '../components/UI';
 
 // ─── STATUS CONFIG ────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -523,7 +523,7 @@ function DetailModal({ dealer, onClose, onPayment, onEdit, onHistory, onDelete }
           Payment History
         </div>
         {loading ? (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>Loading...</div>
+          <LoadingSpinner size={24} padding={20} />
         ) : payments.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>No payments recorded yet.</div>
         ) : (
@@ -807,7 +807,7 @@ export default function Dealers() {
         {/* ─── TABLE ─── */}
         <div className="card">
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-3)' }}>Loading...</div>
+            <TableSkeleton rows={5} cols={6} />
           ) : filtered.length === 0 ? (
             <EmptyState
               icon={<span style={{ fontSize: 32 }}>🏪</span>}

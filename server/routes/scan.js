@@ -116,7 +116,8 @@ router.get('/stats', async (req, res) => {
     ]);
     res.json({ ...stats, keyInfo });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -183,7 +184,7 @@ router.post('/', async (req, res) => {
     res.json({ extracted, _model: tracker.getCurrentModel() });
   } catch (err) {
     console.error('Scan error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

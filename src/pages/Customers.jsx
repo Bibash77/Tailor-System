@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ChevronLeft, Plus, ArrowUpDown, Calendar } from 'lucide-react';
 import { ordersDB } from '../db';
 import { formatCurrency, formatDate } from '../utils';
-import { SearchBar, Badge, EmptyState, ItemTag, Avatar, PageHelp } from '../components/UI';
+import { SearchBar, Badge, EmptyState, ItemTag, Avatar, PageHelp, TableSkeleton } from '../components/UI';
 
 function daysRemaining(dateStr) {
   if (!dateStr) return null;
@@ -274,7 +274,7 @@ export default function CustomersPage({ onNewOrderForCustomer }) {
           </div>
 
           {loading
-            ? <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-3)' }}>Loading...</div>
+            ? <TableSkeleton rows={5} cols={4} />
             : filtered.length === 0
             ? <EmptyState
                 icon={<span style={{ fontSize: 32 }}>👥</span>}

@@ -109,7 +109,7 @@ router.get('/stats', async (req, res) => {
       expectedRevenue,
       month,
     });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // ─── GET /api/admin/users ─────────────────────────────────────────────────────
@@ -128,7 +128,7 @@ router.get('/users', async (req, res) => {
 
     const shopsMap = Object.fromEntries(shopList.map(s => [s._id, s]));
     res.json({ users: users.map(u => enrichUser(u, shopsMap, month)) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // ─── PATCH /api/admin/users/:id — role, status, shopId only ──────────────────
@@ -142,7 +142,7 @@ router.patch('/users/:id', async (req, res) => {
     if (Object.keys($set).length === 0) return res.json({ ok: true });
     await getDB().collection('users').updateOne({ _id: uid(req.params.id) }, { $set });
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // ─── DELETE /api/admin/users/:id ─────────────────────────────────────────────
@@ -150,7 +150,7 @@ router.delete('/users/:id', async (req, res) => {
   try {
     await getDB().collection('users').deleteOne({ _id: uid(req.params.id) });
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // ─── GET /api/admin/shops ─────────────────────────────────────────────────────
@@ -184,7 +184,7 @@ router.get('/shops', async (req, res) => {
         };
       }),
     });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // ─── POST /api/admin/shops ────────────────────────────────────────────────────
@@ -225,7 +225,7 @@ router.post('/shops', async (req, res) => {
     };
     await db.collection('shops').insertOne(shop);
     res.json({ shop });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // ─── PATCH /api/admin/shops/:id — name + quota + billing settings ─────────────
@@ -242,7 +242,7 @@ router.patch('/shops/:id', async (req, res) => {
     if (Object.keys($set).length === 0) return res.json({ ok: true });
     await getDB().collection('shops').updateOne({ _id: req.params.id }, { $set });
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // ─── POST /api/admin/shops/:id/reset-quota ───────────────────────────────────
@@ -253,7 +253,7 @@ router.post('/shops/:id/reset-quota', async (req, res) => {
       { $set: { 'scanQuota.used': 0, 'scanQuota.month': MONTH() } },
     );
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // ─── POST /api/admin/shops/:id/grant-scans ───────────────────────────────────
@@ -265,7 +265,7 @@ router.post('/shops/:id/grant-scans', async (req, res) => {
       { $inc: { 'scanQuota.paidPlanLimit': extra } },
     );
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // ─── POST /api/admin/shops/:id/subscription/payment ──────────────────────────
@@ -291,7 +291,7 @@ router.post('/shops/:id/subscription/payment', async (req, res) => {
       },
     );
     res.json({ ok: true, billedUntil });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // ─── GET /api/admin/defaults ──────────────────────────────────────────────────
@@ -299,7 +299,7 @@ router.get('/defaults', async (req, res) => {
   try {
     const doc = await getDB().collection('settings').findOne({ _id: 'adminDefaults' });
     res.json({ freeScanLimit: 20, monthlyCharge: 500, ...(doc || {}) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // ─── PATCH /api/admin/defaults ────────────────────────────────────────────────
@@ -315,7 +315,7 @@ router.patch('/defaults', async (req, res) => {
       { upsert: true },
     );
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // ─── GET /api/admin/scan-history ─────────────────────────────────────────────
@@ -328,7 +328,7 @@ router.get('/scan-history', async (req, res) => {
       .find({ createdAt: { $gte: from } }, { projection: { imageThumb: 0 } })
       .sort({ createdAt: -1 }).limit(200).toArray();
     res.json({ rows });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 module.exports = router;

@@ -144,7 +144,7 @@ router.get('/quota', async (req, res) => {
   try {
     const q = await getShopQuota(getDB(), req.user.email);
     res.json(q);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // GET /api/scan-queue
@@ -157,7 +157,7 @@ router.get('/', async (req, res) => {
       .project({ imageThumb: 1, status: 1, extracted: 1, error: 1, createdAt: 1 })
       .toArray();
     res.json({ items });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // POST /api/scan-queue  ← CHARGE HAPPENS HERE on every API hit
@@ -200,13 +200,14 @@ router.post('/', async (req, res) => {
       );
       return res.json({ id: insertedId, status: 'ready', extracted, thumb: thumb || null });
     } catch (err) {
+      const errMsg = err.message?.includes('unavailable') ? err.message : 'Scan failed. Please try again.';
       await db.collection('scanQueue').updateOne(
         { _id: insertedId },
-        { $set: { status: 'failed', error: err.message, processedAt: new Date() } },
+        { $set: { status: 'failed', error: errMsg, processedAt: new Date() } },
       );
-      return res.json({ id: insertedId, status: 'failed', error: err.message });
+      return res.json({ id: insertedId, status: 'failed', error: errMsg });
     }
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // POST /api/scan-queue/:id/confirm
@@ -245,7 +246,7 @@ router.post('/:id/confirm', async (req, res) => {
     }
 
     res.json({ ok: true, orderId });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 // DELETE /api/scan-queue/:id
@@ -253,7 +254,7 @@ router.delete('/:id', async (req, res) => {
   try {
     await getDB().collection('scanQueue').deleteOne({ _id: new ObjectId(req.params.id) });
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Internal server error' }); }
 });
 
 module.exports = router;

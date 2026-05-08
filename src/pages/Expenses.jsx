@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Check, X, ArrowUpDown, ChevronLeft, ChevronRight, History } from 'lucide-react';
 import { expensesDB } from '../db';
 import { generateUUID, formatCurrency, formatDate, todayISO, monthKey, monthLabel, prevMonthKey, nextMonthKey, entryMonthKey, applyEdit } from '../utils';
-import { Badge, EmptyState, FormGroup, HistoryModal, PageHelp } from '../components/UI';
+import { Badge, EmptyState, FormGroup, HistoryModal, PageHelp, TableSkeleton } from '../components/UI';
 
 export const EXPENSE_CATEGORIES = [
   'Transport', 'Materials', 'Rent', 'Utilities', 'Salaries', 'Food & Meals', 'Other',
@@ -337,7 +337,7 @@ export default function Expenses() {
           </div>
 
           {loading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-3)' }}>Loading...</div>
+            <TableSkeleton rows={5} cols={5} />
           ) : filtered.length === 0 ? (
             <EmptyState
               icon={<span style={{ fontSize: 32 }}>🧾</span>}

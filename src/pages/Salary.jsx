@@ -8,7 +8,7 @@ import {
   generateUUID, formatCurrency, formatDate,
   todayISO, monthKey, monthLabel, prevMonthKey, nextMonthKey,
 } from '../utils';
-import { Modal, Avatar, FormGroup, EmptyState, PageHelp } from '../components/UI';
+import { Modal, Avatar, FormGroup, EmptyState, PageHelp, TableSkeleton } from '../components/UI';
 
 const WORKERS_PER_PAGE = 8;
 const HISTORY_PAGE_SIZE = 10;
@@ -906,7 +906,7 @@ export default function Salary() {
 
         {/* ── MAIN TABLE ── */}
         {loading ? (
-          <div style={{ padding: 48, textAlign: 'center', color: 'var(--ink-3)' }}>Loading…</div>
+          <TableSkeleton rows={5} cols={5} />
         ) : workers.length === 0 ? (
           <EmptyState
             icon={<span style={{ fontSize: 36 }}>👷</span>}

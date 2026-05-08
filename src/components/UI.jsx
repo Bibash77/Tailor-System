@@ -108,15 +108,51 @@ export function ConfirmModal({ title, message, onConfirm, onCancel, confirmLabel
   );
 }
 
-export function LoadingSpinner() {
+export function LoadingSpinner({ size = 32, padding = 60 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 60 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding }}>
       <div style={{
-        width: 32, height: 32, border: '3px solid var(--paper-3)',
+        width: size, height: size, border: '3px solid var(--paper-3)',
         borderTopColor: 'var(--ink)', borderRadius: '50%',
         animation: 'spin 0.7s linear infinite'
       }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+export function TableSkeleton({ rows = 5, cols = 4 }) {
+  const widths = [60, 100, 80, 70, 90, 50, 110, 75];
+  return (
+    <div style={{ padding: '0 0 8px' }}>
+      {Array.from({ length: rows }).map((_, r) => (
+        <div key={r} style={{
+          display: 'flex', gap: 12, padding: '12px 16px',
+          borderBottom: '1px solid var(--paper-2)',
+          alignItems: 'center',
+        }}>
+          {Array.from({ length: cols }).map((_, c) => (
+            <div
+              key={c}
+              className="skeleton"
+              style={{ height: 14, flex: c === 1 ? 2 : 1, maxWidth: widths[(r + c) % widths.length] }}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function CardSkeleton({ count = 3 }) {
+  return (
+    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="card" style={{ flex: '1 1 200px', padding: 20, minWidth: 160 }}>
+          <div className="skeleton" style={{ height: 11, width: '60%', marginBottom: 10 }} />
+          <div className="skeleton" style={{ height: 28, width: '80%', marginBottom: 8 }} />
+          <div className="skeleton" style={{ height: 11, width: '40%' }} />
+        </div>
+      ))}
     </div>
   );
 }

@@ -23,7 +23,7 @@ router.post('/', async (req, res) => {
     });
     res.json({ url: result.secure_url });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error(e); res.status(500).json({ error: 'Upload failed. Please try again.' });
   }
 });
 
